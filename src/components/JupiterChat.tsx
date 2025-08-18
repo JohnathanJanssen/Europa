@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Mic, Send, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +22,9 @@ export const JupiterChat: React.FC = () => {
   const navigate = useNavigate();
   const waveformRef = useRef<HTMLCanvasElement>(null);
 
+  // Track if we should send after recording
+  const [pendingSend, setPendingSend] = useState(false);
+
   // Handle push-to-talk
   const handleMicDown = () => {
     setIsRecording(true);
@@ -30,13 +33,24 @@ export const JupiterChat: React.FC = () => {
   const handleMicUp = async () => {
     setIsRecording(false);
     await stopRecording();
-    if (audioBlob) {
-      // Transcribe and send
+    setPendingSend(true); // Wait for audioBlob/transcript to update
+  };
+
+  // When audioBlob and transcript are ready after recording, send the message
+  useEffect(() => {
+    if (
+      pendingSend &&
+      audioBlob &&
+      !isRecording &&
+      !isTranscribing
+    ) {
       const text = transcript || "";
       setInput(text);
       handleSend(text, audioBlob);
+      setPendingSend(false);
     }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingSend, audioBlob, transcript, isRecording, isTranscribing]);
 
   // Handle text send
   const handleSend = async (text: string, audio?: Blob) => {
