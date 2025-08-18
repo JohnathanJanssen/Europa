@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
 import { useJupiterTTS } from "@/hooks/use-jupiter-tts";
 import { useJupiterEmotion } from "@/hooks/use-jupiter-emotion";
-import { useJupiterChat } from "@/hooks/use-jupiter-chat";
+import { useOpenAIChat } from "@/hooks/use-openai-chat";
 import { Waveform } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 
@@ -18,7 +18,7 @@ export const JupiterChat: React.FC = () => {
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion, emotion, confidence } = useJupiterEmotion();
-  const { sendMessage, messages, isLoading } = useJupiterChat();
+  const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
   const waveformRef = useRef<HTMLCanvasElement>(null);
 
@@ -47,16 +47,13 @@ export const JupiterChat: React.FC = () => {
     // Send to Jupiter
     sendMessage({
       text,
-      audio,
-      emotion: emotionResult,
-      onStream: (partial: string, audioUrl?: string) => {
+      onStream: (partial: string) => {
         setStreamingReply(partial);
-        if (audioUrl) setStreamingAudioUrl(audioUrl);
       },
-      onDone: (final: string, audioUrl?: string) => {
+      onDone: (final: string) => {
         setStreamingReply("");
         setStreamingAudioUrl(null);
-        if (audioUrl) speak(audioUrl);
+        speak(final);
       },
     });
   };
