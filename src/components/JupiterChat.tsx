@@ -1,0 +1,121 @@
+import React, { useState, useRef } from "react";
+import { Mic, Send, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { useJupiterASR } from "@/hooks/use-jupiter-asr";
+import { useJupiterTTS } from "@/hooks/use-jupiter-tts";
+import { useJupiterEmotion } from "@/hooks/use-jupiter-emotion";
+import { useJupiterChat } from "@/hooks/use-jupiter-chat";
+import { Waveform } from "@/components/Waveform";
+import { useNavigate } from "react-router-dom";
+
+export const JupiterChat: React.FC = () => {
+  const [input, setInput] = useState("");
+  const [isRecording, setIsRecording] = useState(false);
+  const [streamingReply, setStreamingReply] = useState("");
+  const [streamingAudioUrl, setStreamingAudioUrl] = useState<string | null>(null);
+  const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
+  const { speak, isSpeaking } = useJupiterTTS();
+  const { classifyEmotion, emotion, confidence } = useJupiterEmotion();
+  const { sendMessage, messages, isLoading } = useJupiterChat();
+  const navigate = useNavigate();
+  const waveformRef = useRef<HTMLCanvasElement>(null);
+
+  // Handle push-to-talk
+  const handleMicDown = () => {
+    setIsRecording(true);
+    startRecording();
+  };
+  const handleMicUp = async () => {
+    setIsRecording(false);
+    await stopRecording();
+    if (audioBlob) {
+      // Transcribe and send
+      const text = transcript || "";
+      setInput(text);
+      handleSend(text, audioBlob);
+    }
+  };
+
+  // Handle text send
+  const handleSend = async (text: string, audio?: Blob) => {
+    if (!text.trim()) return;
+    setInput("");
+    // Emotion classification
+    const emotionResult = await classifyEmotion(text);
+    // Send to Jupiter
+    sendMessage({
+      text,
+      audio,
+      emotion: emotionResult,
+      onStream: (partial: string, audioUrl?: string) => {
+        setStreamingReply(partial);
+        if (audioUrl) setStreamingAudioUrl(audioUrl);
+      },
+      onDone: (final: string, audioUrl?: string) => {
+        setStreamingReply("");
+        setStreamingAudioUrl(null);
+        if (audioUrl) speak(audioUrl);
+      },
+    });
+  };
+
+  return (
+    <div className="flex flex-col h-[90vh] max-w-xl mx-auto">
+      <div className="flex items-center justify-between p-2">
+        <h2 className="text-xl font-bold">Jupiter</h2>
+        <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+          <Settings />
+        </Button>
+      </div>
+      <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
+              <div>{msg.text}</div>
+              {msg.emotion && (
+                <div className="text-xs mt-1 text-gray-500">Emotion: {msg.emotion.label} ({Math.round(msg.emotion.confidence * 100)}%)</div>
+              )}
+            </div>
+          </div>
+        ))}
+        {streamingReply && (
+          <div className="flex justify-start">
+            <div className="rounded-lg px-4 py-2 bg-secondary animate-pulse max-w-[80%]">
+              {streamingReply}
+            </div>
+          </div>
+        )}
+      </Card>
+      <div className="p-2 flex items-center gap-2">
+        <Button
+          variant={isRecording ? "destructive" : "outline"}
+          size="icon"
+          onMouseDown={handleMicDown}
+          onMouseUp={handleMicUp}
+          aria-label="Push to talk"
+        >
+          <Mic className={isRecording ? "animate-pulse text-red-500" : ""} />
+        </Button>
+        <div className="flex-1">
+          <Input
+            placeholder="Type your message…"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Enter") handleSend(input);
+            }}
+            disabled={isLoading}
+          />
+        </div>
+        <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send">
+          <Send />
+        </Button>
+      </div>
+      <div className="h-12 flex items-center px-2">
+        <Waveform isActive={isRecording || isSpeaking} ref={waveformRef} />
+      </div>
+    </div>
+  );
+};
