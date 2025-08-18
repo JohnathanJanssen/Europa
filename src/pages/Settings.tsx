@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,14 +16,41 @@ const models = [
   { id: "gpt-3.5", name: "Economy Mode" },
 ];
 
-export default function Settings() {
-  const [voice, setVoice] = useState("default");
-  const [model, setModel] = useState("gpt-4");
-  const [wakeWord, setWakeWord] = useState(false);
-  const [memoryLimit, setMemoryLimit] = useState(100);
-  const [privacy, setPrivacy] = useState(true);
+const SETTINGS_KEY = "jupiter_settings";
 
-  // TODO: Persist settings to backend or localStorage
+type SettingsType = {
+  voice: string;
+  model: string;
+  wakeWord: boolean;
+  memoryLimit: number;
+  privacy: boolean;
+};
+
+const defaultSettings: SettingsType = {
+  voice: "default",
+  model: "gpt-4",
+  wakeWord: false,
+  memoryLimit: 100,
+  privacy: true,
+};
+
+export default function Settings() {
+  const [settings, setSettings] = useState<SettingsType>(defaultSettings);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem(SETTINGS_KEY);
+    if (stored) {
+      try {
+        setSettings({ ...defaultSettings, ...JSON.parse(stored) });
+      } catch {}
+    }
+  }, []);
+
+  // Save to localStorage on change
+  useEffect(() => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -33,8 +60,8 @@ export default function Settings() {
           <Label>Model Tier</Label>
           <select
             className="w-full border rounded p-2 mt-1"
-            value={model}
-            onChange={e => setModel(e.target.value)}
+            value={settings.model}
+            onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
           >
             {models.map(m => (
               <option key={m.id} value={m.id}>{m.name}</option>
@@ -45,8 +72,8 @@ export default function Settings() {
           <Label>Voice</Label>
           <select
             className="w-full border rounded p-2 mt-1"
-            value={voice}
-            onChange={e => setVoice(e.target.value)}
+            value={settings.voice}
+            onChange={e => setSettings(s => ({ ...s, voice: e.target.value }))}
           >
             {voices.map(v => (
               <option key={v.id} value={v.id}>{v.name}</option>
@@ -55,7 +82,7 @@ export default function Settings() {
         </div>
         <div className="flex items-center justify-between">
           <Label>Wake Word</Label>
-          <Switch checked={wakeWord} onCheckedChange={setWakeWord} />
+          <Switch checked={settings.wakeWord} onCheckedChange={val => setSettings(s => ({ ...s, wakeWord: val }))} />
         </div>
         <div>
           <Label>Memory Limit (messages)</Label>
@@ -63,13 +90,13 @@ export default function Settings() {
             type="number"
             min={10}
             max={1000}
-            value={memoryLimit}
-            onChange={e => setMemoryLimit(Number(e.target.value))}
+            value={settings.memoryLimit}
+            onChange={e => setSettings(s => ({ ...s, memoryLimit: Number(e.target.value) }))}
           />
         </div>
         <div className="flex items-center justify-between">
           <Label>Privacy Mode</Label>
-          <Switch checked={privacy} onCheckedChange={setPrivacy} />
+          <Switch checked={settings.privacy} onCheckedChange={val => setSettings(s => ({ ...s, privacy: val }))} />
         </div>
         <Button onClick={() => window.history.back()}>Back</Button>
       </Card>
