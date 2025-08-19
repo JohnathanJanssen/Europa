@@ -6,7 +6,7 @@ import { useJupiterASR } from "@/hooks/use-jupiter-asr";
 import { useJupiterTTS } from "@/hooks/use-jupiter-tts";
 import { useJupiterEmotion } from "@/hooks/use-jupiter-emotion";
 import { useOpenAIChat } from "@/hooks/use-openai-chat";
-import { Waveform } from "@/components/Waveform";
+import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -30,7 +30,9 @@ export const JupiterChat: React.FC = () => {
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
-  const waveformRef = useRef<HTMLDivElement>(null);
+
+  // Glow intensity for the widget border
+  const glowLevel = useGlowLevel(isRecording || isSpeaking);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -159,11 +161,17 @@ export const JupiterChat: React.FC = () => {
   // Use chatHistory as fallback if messages is empty
   const displayMessages = messages.length > 0 ? messages : chatHistory;
 
+  // Animated glow style
+  const glowColor = `0 0 32px ${24 + glowLevel * 32}px rgba(129, 140, 248, ${0.25 + glowLevel * 0.45}), 0 0 64px ${32 + glowLevel * 48}px rgba(168, 28, 175, ${0.12 + glowLevel * 0.25})`;
+
   return (
-    <div className="flex flex-col h-[70vh] max-w-md w-full mx-auto bg-black/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#2d2d4d] p-2"
+    <div
+      className="flex flex-col h-[70vh] max-w-md w-full mx-auto bg-black/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#2d2d4d] p-2 transition-shadow duration-300"
       style={{
         minWidth: 340,
-        boxShadow: "0 8px 32px 0 #000a, 0 1.5px 8px 0 #6366f133",
+        boxShadow: `0 8px 32px 0 #000a, 0 1.5px 8px 0 #6366f133, ${glowColor}`,
+        outline: glowLevel > 0.01 ? `2.5px solid rgba(129,140,248,${0.18 + glowLevel * 0.22})` : "none",
+        transition: "box-shadow 0.3s, outline 0.3s"
       }}
     >
       <div className="flex items-center justify-between p-2 pb-0">
@@ -243,7 +251,6 @@ export const JupiterChat: React.FC = () => {
               boxShadow: "0 1.5px 8px 0 #6366f122",
             }}
           />
-          <Waveform isActive={isRecording || isSpeaking} />
         </div>
         <Button
           onClick={() => handleSend(input)}
