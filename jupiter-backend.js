@@ -64,6 +64,15 @@ app.post("/terminal", (req, res) => {
   });
 });
 
+// --- Static File Serving ---
+// Serve the built React app
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// For any other request, serve the index.html file
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
 app.listen(PORT, () => {
   console.log(`Jupiter backend running on http://localhost:${PORT}`);
 });
