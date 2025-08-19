@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Mic, Send, Settings } from "lucide-react";
+import { Mic, Send, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -143,6 +143,14 @@ export const JupiterChat: React.FC = () => {
     });
   };
 
+  // Clear chat handler
+  const handleClearChat = () => {
+    setChatHistory([]);
+    localStorage.removeItem(CHAT_HISTORY_KEY);
+    toast.success("Chat history cleared.");
+    // Optionally, reload the page or reset messages in useOpenAIChat if possible
+  };
+
   // Use chatHistory as fallback if messages is empty
   const displayMessages = messages.length > 0 ? messages : chatHistory;
 
@@ -150,9 +158,20 @@ export const JupiterChat: React.FC = () => {
     <div className="flex flex-col h-[90vh] max-w-xl mx-auto">
       <div className="flex items-center justify-between p-2">
         <h2 className="text-xl font-bold">Jupiter</h2>
-        <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
-          <Settings />
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleClearChat}
+            aria-label="Clear Chat"
+            title="Clear Chat"
+          >
+            <Trash2 />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+            <Settings />
+          </Button>
+        </div>
       </div>
       <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
         {displayMessages.map((msg: any) => (
