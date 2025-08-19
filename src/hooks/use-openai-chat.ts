@@ -8,6 +8,7 @@ type Message = {
   id: string;
   role: "user" | "assistant" | "tool";
   text: string;
+  imageUrl?: string; // For user messages with images
   tool_calls?: any[];
   tool_call_id?: string;
   name?: string;
@@ -149,12 +150,14 @@ export function useOpenAIChat() {
 
   const sendMessage = async ({
     text,
+    imageUrl,
     onStream,
     onDone,
     model = DEFAULT_MODEL,
     toolImplementations,
   }: {
     text: string;
+    imageUrl?: string;
     onStream?: (partial: string) => void;
     onDone?: (final: string) => void;
     model?: string;
@@ -165,6 +168,7 @@ export function useOpenAIChat() {
       id: Date.now().toString(),
       role: "user",
       text,
+      imageUrl,
     };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
@@ -184,11 +188,25 @@ export function useOpenAIChat() {
       return;
     }
 
-    const history = newMessages.map(m => ({
-      role: m.role,
-      content: m.text,
-      tool_calls: m.tool_calls,
-    }));
+    const history = newMessages.map(m => {
+      const baseMessage: any = {
+        role: m.role,
+        name: m.name,
+        tool_calls: m.tool_calls,
+        tool_call_id: m.tool_call_id,
+      };
+
+      if (m.role === 'user' && m.imageUrl) {
+        baseMessage.content = [
+          { type: 'text', text: m.text },
+          { type: 'image_url', image_url: { url: m.imageUrl } }
+        ];
+      } else {
+        baseMessage.content = m.text;
+      }
+
+      return baseMessage;
+    });
 
     const runConversation = async (currentMessages: any[]) => {
       const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -202,6 +220,7 @@ export function useOpenAIChat() {
           messages: [{ role: "system", content: JUPITER_PERSONALITY }, ...currentMessages],
           tools: tools,
           tool_choice: "auto",
+          max_tokens: 4000,
         }),
       });
 

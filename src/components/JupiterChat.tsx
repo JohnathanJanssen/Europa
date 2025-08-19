@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from "react";
-import { Mic, Send, Settings, Trash2, Terminal } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Mic, Send, Settings, Trash2, Terminal, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
@@ -11,6 +11,8 @@ import { useJupiterTerminal } from "@/hooks/use-jupiter-terminal";
 import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useCamera } from "@/hooks/use-camera";
+import { CameraView } from "./CameraView";
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -26,13 +28,12 @@ export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isDropping, setIsDropping] = useState(false);
-  const [streamingReply, setStreamingReply] = useState("");
-  const [streamingAudioUrl, setStreamingAudioUrl] = useState<string | null>(null);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
+  const { isCameraOn, startCamera, stopCamera, captureFrame, videoRef } = useCamera();
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
@@ -49,7 +50,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   // Glow intensity for the widget border and aura
-  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading);
+  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || isCameraOn);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -126,23 +127,22 @@ export const JupiterChat: React.FC = () => {
   }, [pendingSend, audioBlob, transcript, isRecording, isTranscribing]);
 
   // Handle text send
-  const handleSend = async (text: string) => {
-    if (!text.trim()) return;
+  const handleSend = async (text: string, imageUrl?: string) => {
+    if (!text.trim() && !imageUrl) return;
     setInput("");
     await classifyEmotion(text);
     sendMessage({
       text,
+      imageUrl,
       model: settings.model === "gpt-3.5" ? "gpt-3.5-turbo" : (settings.model === "gpt-4" ? "gpt-4o" : settings.model),
       toolImplementations,
       onStream: () => {
         // Do nothing here to embody Jupiter's deliberate, non-streamed thought process.
       },
       onDone: (final: string) => {
-        setStreamingReply("");
-        setStreamingAudioUrl(null);
         // A deliberate pause before speaking, reflecting Jupiter's thoughtful nature.
         setTimeout(() => {
-          speak(final, settings.voice).catch(() => {
+          speak(final).catch(() => {
             toast.error("Text-to-speech failed.");
           });
         }, 500);
@@ -155,8 +155,6 @@ export const JupiterChat: React.FC = () => {
   const handleClearChat = () => {
     setChatHistory([]);
     localStorage.removeItem(CHAT_HISTORY_KEY);
-    // This is a bit of a hack; a proper state management solution (like Zustand or Redux)
-    // would allow resetting the hook's state directly. For now, we reload.
     window.location.reload();
     toast.success("Chat history cleared.");
   };
@@ -175,14 +173,35 @@ export const JupiterChat: React.FC = () => {
     setIsDropping(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const content = event.target?.result as string;
-        const message = `I have uploaded the file named "${file.name}". Its content is:\n\n---\n${content}\n---\n\nPlease analyze it and let me know what you find.`;
-        handleSend(message);
-        toast.success(`File "${file.name}" loaded. Asking Jupiter to analyze.`);
-      };
-      reader.readAsText(file);
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const imageUrl = event.target?.result as string;
+          handleSend("Describe this image.", imageUrl);
+          toast.success(`Image "${file.name}" loaded. Asking Jupiter to analyze.`);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const content = event.target?.result as string;
+          const message = `I have uploaded the file named "${file.name}". Its content is:\n\n---\n${content}\n---\n\nPlease analyze it and let me know what you find.`;
+          handleSend(message);
+          toast.success(`File "${file.name}" loaded. Asking Jupiter to analyze.`);
+        };
+        reader.readAsText(file);
+      }
+    }
+  };
+
+  const handleCaptureAndSend = () => {
+    const frame = captureFrame();
+    if (frame) {
+      stopCamera();
+      handleSend("Describe what you see in this image.", frame);
+      toast.success("Image captured. Asking Jupiter to analyze.");
+    } else {
+      toast.error("Failed to capture image.");
     }
   };
 
@@ -222,6 +241,7 @@ export const JupiterChat: React.FC = () => {
           outline: glowLevel > 0.01 || isDropping ? `2.5px solid ${isDropping ? '#4ade80' : colorMix(glowLevel)}` : "none",
         }}
       >
+        {isCameraOn && <CameraView videoRef={videoRef} onCapture={handleCaptureAndSend} onClose={stopCamera} />}
         <div className="flex items-center justify-between p-2 pb-0">
           <span className="text-lg font-bold text-white tracking-widest select-none" style={{ letterSpacing: 3 }}>JUPITER</span>
           <div className="flex gap-2">
@@ -240,6 +260,7 @@ export const JupiterChat: React.FC = () => {
                     : "bg-gradient-to-r from-gray-800 via-gray-900 to-black text-blue-100"
                 }`}
               >
+                {msg.imageUrl && <img src={msg.imageUrl} alt="User content" className="rounded-lg mb-2 max-w-full h-auto" />}
                 <div>{msg.text}</div>
               </div>
             </div>
@@ -259,6 +280,9 @@ export const JupiterChat: React.FC = () => {
         <div className="p-2 pt-0 flex items-center gap-2">
           <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
             <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
+          </Button>
+          <Button variant="outline" size="icon" onClick={startCamera} aria-label="Use Camera" className="rounded-full bg-gray-800 text-white shadow">
+            <Camera className="text-blue-400" />
           </Button>
           <div className="flex-1 flex flex-col">
             <Input
