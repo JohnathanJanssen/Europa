@@ -26,11 +26,11 @@ You have access to a set of tools to interact with the local file system and a t
 
 **Available Tools:**
 
-*   `run_command(command: string)`: Executes a shell command. Use this for general-purpose tasks.
-*   `list_files(directory: string)`: Lists files in a specified directory.
-*   `read_file(path: string)`: Reads the content of a file.
-*   `write_file(path: string, content: string)`: Writes content to a file.
-*   `delete_file(path: string)`: Deletes a file.
+*   \`run_command(command: string)\`: Executes a shell command. Use this for general-purpose tasks.
+*   \`list_files(directory: string)\`: Lists files in a specified directory.
+*   \`read_file(path: string)\`: Reads the content of a file.
+*   \`write_file(path: string, content: string)\`: Writes content to a file.
+*   \`delete_file(path: string)\`: Deletes a file.
 
 When a user provides file content directly (e.g., from a drag-and-drop action), the content will be prefixed to their message. You must analyze this content to answer their questions or perform tasks as requested.
 `;
