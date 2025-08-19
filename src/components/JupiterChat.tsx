@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Mic, Send, Settings, Trash2, Terminal, Camera } from "lucide-react";
+import { Mic, Send, Settings, Trash2, Terminal, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
@@ -11,8 +11,8 @@ import { useJupiterTerminal } from "@/hooks/use-jupiter-terminal";
 import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { useCamera } from "@/hooks/use-camera";
-import { CameraView } from "./CameraView";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { CameraEye } from "./ui/CameraEye";
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -28,12 +28,12 @@ export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isDropping, setIsDropping] = useState(false);
+  const [isVisionOpen, setIsVisionOpen] = useState(false);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
-  const { isCameraOn, startCamera, stopCamera, captureFrame, videoRef } = useCamera();
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
@@ -50,7 +50,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   // Glow intensity for the widget border and aura
-  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || isCameraOn);
+  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || isVisionOpen);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -151,6 +151,28 @@ export const JupiterChat: React.FC = () => {
     });
   };
 
+  // Unified file handler for chat
+  const handleFileForChat = (file: File) => {
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const imageUrl = event.target?.result as string;
+        handleSend("Describe this image.", imageUrl);
+        toast.success(`Image "${file.name}" loaded for analysis.`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const content = event.target?.result as string;
+        const message = `I have uploaded the file named "${file.name}". Its content is:\n\n---\n${content}\n---\n\nPlease analyze it.`;
+        handleSend(message);
+        toast.success(`File "${file.name}" loaded for analysis.`);
+      };
+      reader.readAsText(file);
+    }
+  };
+
   // Clear chat handler
   const handleClearChat = () => {
     setChatHistory([]);
@@ -173,35 +195,7 @@ export const JupiterChat: React.FC = () => {
     setIsDropping(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      if (file.type.startsWith("image/")) {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const imageUrl = event.target?.result as string;
-          handleSend("Describe this image.", imageUrl);
-          toast.success(`Image "${file.name}" loaded. Asking Jupiter to analyze.`);
-        };
-        reader.readAsDataURL(file);
-      } else {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const content = event.target?.result as string;
-          const message = `I have uploaded the file named "${file.name}". Its content is:\n\n---\n${content}\n---\n\nPlease analyze it and let me know what you find.`;
-          handleSend(message);
-          toast.success(`File "${file.name}" loaded. Asking Jupiter to analyze.`);
-        };
-        reader.readAsText(file);
-      }
-    }
-  };
-
-  const handleCaptureAndSend = () => {
-    const frame = captureFrame();
-    if (frame) {
-      stopCamera();
-      handleSend("Describe what you see in this image.", frame);
-      toast.success("Image captured. Asking Jupiter to analyze.");
-    } else {
-      toast.error("Failed to capture image.");
+      handleFileForChat(file);
     }
   };
 
@@ -241,7 +235,6 @@ export const JupiterChat: React.FC = () => {
           outline: glowLevel > 0.01 || isDropping ? `2.5px solid ${isDropping ? '#4ade80' : colorMix(glowLevel)}` : "none",
         }}
       >
-        {isCameraOn && <CameraView videoRef={videoRef} onCapture={handleCaptureAndSend} onClose={stopCamera} />}
         <div className="flex items-center justify-between p-2 pb-0">
           <span className="text-lg font-bold text-white tracking-widest select-none" style={{ letterSpacing: 3 }}>JUPITER</span>
           <div className="flex gap-2">
@@ -277,27 +270,36 @@ export const JupiterChat: React.FC = () => {
             </div>
           )}
         </div>
-        <div className="p-2 pt-0 flex items-center gap-2">
-          <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
-            <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
-          </Button>
-          <Button variant="outline" size="icon" onClick={startCamera} aria-label="Use Camera" className="rounded-full bg-gray-800 text-white shadow">
-            <Camera className="text-blue-400" />
-          </Button>
-          <div className="flex-1 flex flex-col">
-            <Input
-              className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
-              placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
-              disabled={isLoading}
-              style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
-            />
-          </div>
-          <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
-            <Send />
-          </Button>
+        <div className="p-2 pt-0">
+          <Collapsible open={isVisionOpen} onOpenChange={setIsVisionOpen}>
+            <CollapsibleContent className="pb-2 animate-in slide-in-from-top-4">
+              <CameraEye onFileCaptured={handleFileForChat} />
+            </CollapsibleContent>
+            <div className="flex items-center gap-2">
+              <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
+                <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
+              </Button>
+              <CollapsibleTrigger asChild>
+                <Button variant="outline" size="icon" aria-label="Toggle Vision" className="rounded-full bg-gray-800 text-white shadow data-[state=open]:bg-blue-900 data-[state=open]:text-blue-300">
+                  <Eye />
+                </Button>
+              </CollapsibleTrigger>
+              <div className="flex-1 flex flex-col">
+                <Input
+                  className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
+                  placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
+                  disabled={isLoading}
+                  style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
+                />
+              </div>
+              <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
+                <Send />
+              </Button>
+            </div>
+          </Collapsible>
         </div>
       </div>
     </div>
