@@ -2,14 +2,108 @@ import { useState } from "react";
 import { JUPITER_PERSONALITY } from "@/personality/jupiter";
 
 const OPENAI_API_KEY = import.meta.env.VITE_OPENAI_API_KEY as string;
-const DEFAULT_MODEL = "gpt-4o"; // You can change to gpt-3.5-turbo if needed
+const DEFAULT_MODEL = "gpt-4o";
 
 type Message = {
   id: string;
-  role: "user" | "assistant";
+  role: "user" | "assistant" | "tool";
   text: string;
-  emotion?: { label: string; confidence: number };
+  tool_calls?: any[];
+  tool_call_id?: string;
+  name?: string;
 };
+
+const tools = [
+  {
+    type: "function",
+    function: {
+      name: "run_command",
+      description: "Executes a shell command in the terminal.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command to execute.",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "list_files",
+      description: "Lists files and directories at a given path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The directory path to list files from. Defaults to the root.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "read_file",
+      description: "Reads the content of a file at a given path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The path of the file to read.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write_file",
+      description: "Writes content to a file at a given path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The path of the file to write to.",
+          },
+          content: {
+            type: "string",
+            description: "The content to write to the file.",
+          },
+        },
+        required: ["path", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_file",
+      description: "Deletes a file at a given path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The path of the file to delete.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+];
 
 export function useOpenAIChat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -20,111 +114,101 @@ export function useOpenAIChat() {
     onStream,
     onDone,
     model = DEFAULT_MODEL,
+    toolImplementations,
   }: {
     text: string;
     onStream?: (partial: string) => void;
     onDone?: (final: string) => void;
     model?: string;
+    toolImplementations: { [key: string]: (...args: any[]) => Promise<any> };
   }) => {
     setIsLoading(true);
-    const userMsg = {
+    const userMsg: Message = {
       id: Date.now().toString(),
-      role: "user" as const,
+      role: "user",
       text,
     };
-    setMessages((prev) => [...prev, userMsg]);
+    const newMessages = [...messages, userMsg];
+    setMessages(newMessages);
 
-    // If no API key, always respond in Preview
     if (!OPENAI_API_KEY) {
+      // Handle preview mode
       const previewReply = "That is correct. (This is a preview response from Jupiter.)";
-      let i = 0;
-      const interval = setInterval(() => {
-        i += 2;
-        onStream?.(previewReply.slice(0, i));
-        if (i >= previewReply.length) {
-          clearInterval(interval);
-          setMessages((prev) => [
-            ...prev,
-            {
-              id: (Date.now() + 1).toString(),
-              role: "assistant" as const,
-              text: previewReply,
-            },
-          ]);
-          setIsLoading(false);
-          onDone?.(previewReply);
-        }
-      }, 40);
+      setTimeout(() => {
+        onStream?.(previewReply);
+        setMessages((prev) => [
+          ...prev,
+          { id: (Date.now() + 1).toString(), role: "assistant", text: previewReply },
+        ]);
+        setIsLoading(false);
+        onDone?.(previewReply);
+      }, 1000);
       return;
     }
 
-    // Prepare OpenAI chat messages
-    const chatHistory = [
-      { role: "system", content: JUPITER_PERSONALITY },
-      ...messages.map((m) => ({
-        role: m.role,
-        content: m.text,
-      })),
-      { role: "user", content: text },
-    ];
+    const history = newMessages.map(m => ({
+      role: m.role,
+      content: m.text,
+      tool_calls: m.tool_calls,
+    }));
 
-    // Stream from OpenAI
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: chatHistory,
-        stream: true,
-        temperature: 0.5,
-        max_tokens: 512,
-      }),
-    });
+    const runConversation = async (currentMessages: any[]) => {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "system", content: JUPITER_PERSONALITY }, ...currentMessages],
+          tools: tools,
+          tool_choice: "auto",
+        }),
+      });
 
-    if (!response.body) {
-      setIsLoading(false);
-      onDone?.("Sorry, no response.");
-      return;
-    }
+      const responseData = await response.json();
+      const responseMessage = responseData.choices[0].message;
+      currentMessages.push(responseMessage);
 
-    const reader = response.body.getReader();
-    let result = "";
-    const decoder = new TextDecoder();
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      // OpenAI streams as "data: ..." lines
-      for (const line of chunk.split("\n")) {
-        if (line.startsWith("data: ")) {
-          const data = line.replace("data: ", "").trim();
-          if (data === "[DONE]") continue;
-          try {
-            const json = JSON.parse(data);
-            const content = json.choices?.[0]?.delta?.content;
-            if (content) {
-              result += content;
-              onStream?.(result);
-            }
-          } catch {}
+      const toolCalls = responseMessage.tool_calls;
+      if (toolCalls) {
+        setMessages(prev => [...prev, { id: Date.now().toString(), role: 'assistant', text: 'Using tools...', tool_calls: toolCalls }]);
+        for (const toolCall of toolCalls) {
+          const functionName = toolCall.function.name;
+          const functionToCall = toolImplementations[functionName];
+          const functionArgs = JSON.parse(toolCall.function.arguments);
+          const functionResponse = await functionToCall(...Object.values(functionArgs));
+          
+          currentMessages.push({
+            tool_call_id: toolCall.id,
+            role: "tool",
+            name: functionName,
+            content: JSON.stringify(functionResponse),
+          });
         }
+        await runConversation(currentMessages);
+      } else {
+        // No tool calls, stream the final response
+        const finalResponse = responseMessage.content;
+        let i = 0;
+        const interval = setInterval(() => {
+          i += 2;
+          onStream?.(finalResponse.slice(0, i));
+          if (i >= finalResponse.length) {
+            clearInterval(interval);
+            setMessages((prev) => [
+              ...prev,
+              { id: (Date.now() + 1).toString(), role: "assistant", text: finalResponse },
+            ]);
+            setIsLoading(false);
+            onDone?.(finalResponse);
+          }
+        }, 20);
       }
-    }
+    };
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: (Date.now() + 1).toString(),
-        role: "assistant" as const,
-        text: result,
-      },
-    ]);
-    setIsLoading(false);
-    onDone?.(result);
+    await runConversation(history);
   };
 
   return {
