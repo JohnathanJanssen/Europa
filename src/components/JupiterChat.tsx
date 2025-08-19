@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { Mic, Send, Settings, Trash2 } from "lucide-react";
+import { Mic, Send, Settings, Trash2, Terminal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
@@ -211,6 +211,16 @@ export const JupiterChat: React.FC = () => {
               className="text-gray-400 hover:text-pink-400"
             >
               <Trash2 />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => navigate("/tools")}
+              className="text-gray-400 hover:text-green-400"
+              title="Open Tools"
+              aria-label="Open Tools"
+            >
+              <Terminal />
             </Button>
             <Button
               variant="ghost"
