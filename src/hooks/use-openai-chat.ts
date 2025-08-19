@@ -34,6 +34,30 @@ export function useOpenAIChat() {
     };
     setMessages((prev) => [...prev, userMsg]);
 
+    // If no API key, always respond in Preview
+    if (!OPENAI_API_KEY) {
+      const previewReply = "That is correct. (This is a preview response from Jupiter.)";
+      let i = 0;
+      const interval = setInterval(() => {
+        i += 2;
+        onStream?.(previewReply.slice(0, i));
+        if (i >= previewReply.length) {
+          clearInterval(interval);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: (Date.now() + 1).toString(),
+              role: "assistant" as const,
+              text: previewReply,
+            },
+          ]);
+          setIsLoading(false);
+          onDone?.(previewReply);
+        }
+      }, 40);
+      return;
+    }
+
     // Prepare OpenAI chat messages
     const chatHistory = [
       { role: "system", content: JUPITER_PERSONALITY },

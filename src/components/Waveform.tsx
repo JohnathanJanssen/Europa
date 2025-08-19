@@ -1,51 +1,64 @@
-import React, { forwardRef, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 
 interface WaveformProps {
   isActive: boolean;
 }
 
-export const Waveform = forwardRef<HTMLCanvasElement, WaveformProps>(
-  ({ isActive }, ref) => {
-    const localRef = useRef<HTMLCanvasElement>(null);
+export const Waveform: React.FC<WaveformProps> = ({ isActive }) => {
+  const animationRef = useRef<number>();
+  const barsRef = useRef<number[]>([8, 14, 10, 18, 12, 16, 9, 13, 11, 15]);
+  const [bars, setBars] = React.useState<number[]>(barsRef.current);
 
-    useEffect(() => {
-      const canvas = (ref as React.RefObject<HTMLCanvasElement>)?.current || localRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+  useEffect(() => {
+    let frame = 0;
+    function animate() {
       if (isActive) {
-        // Simple animated waveform
-        let frame = 0;
-        let anim: number;
-        const draw = () => {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.strokeStyle = "#3b82f6";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          for (let x = 0; x < canvas.width; x += 4) {
-            const y =
-              canvas.height / 2 +
-              Math.sin((x + frame * 8) / 20) * (canvas.height / 4);
-            ctx.lineTo(x, y);
-          }
-          ctx.stroke();
-          frame++;
-          anim = requestAnimationFrame(draw);
-        };
-        draw();
-        return () => cancelAnimationFrame(anim);
+        // Animate bars with a smooth, intelligent pulse
+        setBars(bars =>
+          bars.map((_, i) =>
+            8 +
+            Math.round(
+              8 +
+                Math.sin(frame / 7 + i) * 6 +
+                Math.cos(frame / 11 - i) * 4 +
+                (Math.random() - 0.5) * 2
+            )
+          )
+        );
+        frame++;
+        animationRef.current = requestAnimationFrame(animate);
       }
-    }, [isActive, ref]);
+    }
+    if (isActive) {
+      animate();
+    } else {
+      setBars([8, 14, 10, 18, 12, 16, 9, 13, 11, 15]);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    }
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [isActive]);
 
-    return (
-      <canvas
-        ref={ref || localRef}
-        width={240}
-        height={32}
-        className="w-full h-8 bg-gray-200 rounded"
-        aria-label="Waveform"
-      />
-    );
-  }
-);
+  return (
+    <div className="flex items-end gap-[2px] h-8 w-full px-2">
+      {bars.map((h, i) => (
+        <div
+          key={i}
+          className={`transition-all duration-100 rounded-full`}
+          style={{
+            width: 6,
+            height: `${h * 1.5}px`,
+            background: isActive
+              ? `linear-gradient(180deg, #60a5fa 0%, #a21caf 100%)`
+              : `linear-gradient(180deg, #334155 0%, #1e293b 100%)`,
+            boxShadow: isActive
+              ? "0 0 8px 2px #6366f1, 0 0 16px 4px #a21caf44"
+              : "none",
+            opacity: isActive ? 0.95 : 0.5,
+          }}
+        />
+      ))}
+    </div>
+  );
+};

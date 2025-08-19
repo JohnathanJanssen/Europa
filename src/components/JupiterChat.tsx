@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Mic, Send, Settings, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
 import { useJupiterTTS } from "@/hooks/use-jupiter-tts";
@@ -31,7 +30,7 @@ export const JupiterChat: React.FC = () => {
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
-  const waveformRef = useRef<HTMLCanvasElement>(null);
+  const waveformRef = useRef<HTMLDivElement>(null);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -161,7 +160,7 @@ export const JupiterChat: React.FC = () => {
   const displayMessages = messages.length > 0 ? messages : chatHistory;
 
   return (
-    <div className="flex flex-col h-[90vh] max-w-xl w-full mx-auto bg-gradient-to-br from-[#18182a]/80 via-[#1a1333]/80 to-[#18182a]/80 rounded-3xl shadow-2xl border border-[#2d2d4d] p-2 backdrop-blur-md">
+    <div className="flex flex-col h-[90vh] max-w-xl w-full mx-auto bg-transparent rounded-3xl shadow-2xl border border-[#2d2d4d] p-2 backdrop-blur-md">
       <div className="flex items-center justify-between p-2">
         <span className="text-xl font-bold text-white tracking-tight select-none" style={{ letterSpacing: 2 }}>JUPITER</span>
         <div className="flex gap-2">
@@ -185,7 +184,7 @@ export const JupiterChat: React.FC = () => {
           </Button>
         </div>
       </div>
-      <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/60 backdrop-blur-md rounded-2xl border border-[#2d2d4d]">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent">
         {displayMessages.map((msg: any) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
@@ -211,7 +210,7 @@ export const JupiterChat: React.FC = () => {
             </div>
           </div>
         )}
-      </Card>
+      </div>
       <div className="p-2 flex items-center gap-2">
         <Button
           variant={isRecording ? "destructive" : "outline"}
@@ -223,7 +222,7 @@ export const JupiterChat: React.FC = () => {
         >
           <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
         </Button>
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col">
           <Input
             className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
             placeholder="Type…"
@@ -234,6 +233,9 @@ export const JupiterChat: React.FC = () => {
             }}
             disabled={isLoading}
           />
+          <div ref={waveformRef} className="mt-1">
+            <Waveform isActive={isRecording || isSpeaking} />
+          </div>
         </div>
         <Button
           onClick={() => handleSend(input)}
@@ -244,9 +246,6 @@ export const JupiterChat: React.FC = () => {
         >
           <Send />
         </Button>
-      </div>
-      <div className="h-12 flex items-center px-2">
-        <Waveform isActive={isRecording || isSpeaking} ref={waveformRef} />
       </div>
     </div>
   );
