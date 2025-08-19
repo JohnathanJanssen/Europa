@@ -33,6 +33,12 @@ export const JupiterChat: React.FC = () => {
   const navigate = useNavigate();
   const waveformRef = useRef<HTMLCanvasElement>(null);
 
+  // Force dark mode on mount
+  useEffect(() => {
+    document.body.classList.add("dark");
+    return () => document.body.classList.remove("dark");
+  }, []);
+
   // Settings state
   const [settings, setSettings] = useState(() => {
     try {
@@ -155,9 +161,9 @@ export const JupiterChat: React.FC = () => {
   const displayMessages = messages.length > 0 ? messages : chatHistory;
 
   return (
-    <div className="flex flex-col h-[90vh] max-w-xl mx-auto">
+    <div className="flex flex-col h-[90vh] max-w-xl mx-auto bg-gradient-to-br from-black via-gray-900 to-gray-800 rounded-3xl shadow-2xl border border-gray-800 p-2">
       <div className="flex items-center justify-between p-2">
-        <h2 className="text-xl font-bold">Jupiter</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">Jupiter</h2>
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -165,28 +171,42 @@ export const JupiterChat: React.FC = () => {
             onClick={handleClearChat}
             aria-label="Clear Chat"
             title="Clear Chat"
+            className="text-gray-400 hover:text-red-400"
           >
             <Trash2 />
           </Button>
-          <Button variant="ghost" size="icon" onClick={() => navigate("/settings")}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/settings")}
+            className="text-gray-400 hover:text-blue-400"
+          >
             <Settings />
           </Button>
         </div>
       </div>
-      <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
+      <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-black/60 backdrop-blur-md rounded-2xl border border-gray-800">
         {displayMessages.map((msg: any) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-            <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
+            <div
+              className={`rounded-2xl px-4 py-2 max-w-[80%] shadow ${
+                msg.role === "user"
+                  ? "bg-blue-700 text-white font-semibold"
+                  : "bg-gray-800 text-gray-100"
+              }`}
+            >
               <div>{msg.text}</div>
               {msg.emotion && (
-                <div className="text-xs mt-1 text-gray-500">Emotion: {msg.emotion.label} ({Math.round(msg.emotion.confidence * 100)}%)</div>
+                <div className="text-xs mt-1 text-blue-300 opacity-80">
+                  Emotion: {msg.emotion.label} ({Math.round(msg.emotion.confidence * 100)}%)
+                </div>
               )}
             </div>
           </div>
         ))}
         {streamingReply && (
           <div className="flex justify-start">
-            <div className="rounded-lg px-4 py-2 bg-secondary animate-pulse max-w-[80%]">
+            <div className="rounded-2xl px-4 py-2 bg-gray-800 text-gray-100 animate-pulse max-w-[80%] shadow">
               {streamingReply}
             </div>
           </div>
@@ -199,11 +219,13 @@ export const JupiterChat: React.FC = () => {
           onMouseDown={handleMicDown}
           onMouseUp={handleMicUp}
           aria-label="Push to talk"
+          className={`rounded-full ${isRecording ? "bg-red-700" : "bg-gray-800"} text-white shadow`}
         >
-          <Mic className={isRecording ? "animate-pulse text-red-500" : ""} />
+          <Mic className={isRecording ? "animate-pulse text-red-400" : "text-blue-400"} />
         </Button>
         <div className="flex-1">
           <Input
+            className="bg-gray-900 text-white rounded-full border border-gray-700 px-4 py-2 focus:ring-2 focus:ring-blue-600"
             placeholder="Type your message…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -213,7 +235,13 @@ export const JupiterChat: React.FC = () => {
             disabled={isLoading}
           />
         </div>
-        <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send">
+        <Button
+          onClick={() => handleSend(input)}
+          disabled={isLoading || !input.trim()}
+          size="icon"
+          aria-label="Send"
+          className="bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow"
+        >
           <Send />
         </Button>
       </div>

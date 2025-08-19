@@ -37,6 +37,12 @@ const defaultSettings: SettingsType = {
 export default function Settings() {
   const [settings, setSettings] = useState<SettingsType>(defaultSettings);
 
+  // Force dark mode on mount
+  useEffect(() => {
+    document.body.classList.add("dark");
+    return () => document.body.classList.remove("dark");
+  }, []);
+
   // Load from localStorage on mount
   useEffect(() => {
     const stored = localStorage.getItem(SETTINGS_KEY);
@@ -53,13 +59,13 @@ export default function Settings() {
   }, [settings]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <Card className="p-8 w-full max-w-lg space-y-6">
-        <h2 className="text-2xl font-bold mb-2">Jupiter Settings</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-black via-gray-900 to-gray-800">
+      <Card className="p-8 w-full max-w-lg space-y-6 bg-black/60 backdrop-blur-md rounded-2xl border border-gray-800 shadow-2xl">
+        <h2 className="text-2xl font-bold mb-2 text-white tracking-tight">Jupiter Settings</h2>
         <div>
-          <Label>Model Tier</Label>
+          <Label className="text-gray-300">Model Tier</Label>
           <select
-            className="w-full border rounded p-2 mt-1"
+            className="w-full border border-gray-700 rounded bg-gray-900 text-white p-2 mt-1"
             value={settings.model}
             onChange={e => setSettings(s => ({ ...s, model: e.target.value }))}
           >
@@ -69,9 +75,9 @@ export default function Settings() {
           </select>
         </div>
         <div>
-          <Label>Voice</Label>
+          <Label className="text-gray-300">Voice</Label>
           <select
-            className="w-full border rounded p-2 mt-1"
+            className="w-full border border-gray-700 rounded bg-gray-900 text-white p-2 mt-1"
             value={settings.voice}
             onChange={e => setSettings(s => ({ ...s, voice: e.target.value }))}
           >
@@ -81,12 +87,13 @@ export default function Settings() {
           </select>
         </div>
         <div className="flex items-center justify-between">
-          <Label>Wake Word</Label>
+          <Label className="text-gray-300">Wake Word</Label>
           <Switch checked={settings.wakeWord} onCheckedChange={val => setSettings(s => ({ ...s, wakeWord: val }))} />
         </div>
         <div>
-          <Label>Memory Limit (messages)</Label>
+          <Label className="text-gray-300">Memory Limit (messages)</Label>
           <Input
+            className="bg-gray-900 text-white border border-gray-700 rounded"
             type="number"
             min={10}
             max={1000}
@@ -95,10 +102,15 @@ export default function Settings() {
           />
         </div>
         <div className="flex items-center justify-between">
-          <Label>Privacy Mode</Label>
+          <Label className="text-gray-300">Privacy Mode</Label>
           <Switch checked={settings.privacy} onCheckedChange={val => setSettings(s => ({ ...s, privacy: val }))} />
         </div>
-        <Button onClick={() => window.history.back()}>Back</Button>
+        <Button
+          className="bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-full px-6 py-2 shadow"
+          onClick={() => window.history.back()}
+        >
+          Back
+        </Button>
       </Card>
     </div>
   );
