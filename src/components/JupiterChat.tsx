@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 const SETTINGS_KEY = "jupiter_settings";
+const CHAT_HISTORY_KEY = "jupiter_chat_history";
 const defaultSettings = {
   voice: "default",
   model: "gpt-4",
@@ -42,15 +43,44 @@ export const JupiterChat: React.FC = () => {
     }
   });
 
+  // Chat history state
+  const [chatHistory, setChatHistory] = useState(() => {
+    try {
+      const stored = localStorage.getItem(CHAT_HISTORY_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
   // Watch for settings changes in localStorage (in case user changes them in another tab)
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === SETTINGS_KEY && e.newValue) {
         setSettings({ ...defaultSettings, ...JSON.parse(e.newValue) });
       }
+      if (e.key === CHAT_HISTORY_KEY && e.newValue) {
+        setChatHistory(JSON.parse(e.newValue));
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Sync chat history with messages from useOpenAIChat
+  useEffect(() => {
+    setChatHistory(messages);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  // On mount, load chat history into useOpenAIChat if available
+  useEffect(() => {
+    if (chatHistory.length > 0 && messages.length === 0) {
+      // This is a hack: we can't set messages in useOpenAIChat directly,
+      // but for a real app, you'd want to lift state up or use a context/store.
+      // For now, just display chatHistory as a fallback.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Track if we should send after recording
@@ -113,6 +143,9 @@ export const JupiterChat: React.FC = () => {
     });
   };
 
+  // Use chatHistory as fallback if messages is empty
+  const displayMessages = messages.length > 0 ? messages : chatHistory;
+
   return (
     <div className="flex flex-col h-[90vh] max-w-xl mx-auto">
       <div className="flex items-center justify-between p-2">
@@ -122,7 +155,7 @@ export const JupiterChat: React.FC = () => {
         </Button>
       </div>
       <Card className="flex-1 overflow-y-auto p-4 space-y-4 bg-background">
-        {messages.map((msg) => (
+        {displayMessages.map((msg: any) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`rounded-lg px-4 py-2 max-w-[80%] ${msg.role === "user" ? "bg-primary text-primary-foreground" : "bg-secondary"}`}>
               <div>{msg.text}</div>
