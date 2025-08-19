@@ -9,6 +9,7 @@ import { useJupiterEmotion } from "@/hooks/use-jupiter-emotion";
 import { useOpenAIChat } from "@/hooks/use-openai-chat";
 import { Waveform } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 const SETTINGS_KEY = "jupiter_settings";
 const defaultSettings = {
@@ -76,7 +77,11 @@ export const JupiterChat: React.FC = () => {
     ) {
       const text = transcript || "";
       setInput(text);
-      handleSend(text, audioBlob);
+      if (!text) {
+        toast.error("Speech recognition failed. Please try again.");
+      } else {
+        handleSend(text, audioBlob);
+      }
       setPendingSend(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +104,11 @@ export const JupiterChat: React.FC = () => {
         setStreamingReply("");
         setStreamingAudioUrl(null);
         // Pass selected voice to TTS (future extensibility)
-        speak(final, settings.voice);
+        speak(final, settings.voice)
+          .catch(() => {
+            toast.error("Text-to-speech failed.");
+          });
+        toast.success("Message sent!");
       },
     });
   };
