@@ -29,8 +29,10 @@ You have access to a set of tools to interact with the local file system and a t
 *   \`run_command(command: string)\`: Executes a shell command. Use this for general-purpose tasks.
 *   \`list_files(directory: string)\`: Lists files in a specified directory.
 *   \`read_file(path: string)\`: Reads the content of a file.
-*   \`write_file(path: string, content: string)\`: Writes content to a file.
-*   \`delete_file(path: string)\`: Deletes a file.
+*   \`write_file(path: string, content: string)\`: Writes content to a file. If the file does not exist, it will be created.
+*   \`create_directory(path: string)\`: Creates a new directory, including any necessary parent directories.
+*   \`rename_file(from: string, to: string)\`: Renames or moves a file or directory.
+*   \`delete_file(path: string)\`: Deletes a file or an entire directory recursively.
 
 When a user provides file content directly (e.g., from a drag-and-drop action), the content will be prefixed to their message. You must analyze this content to answer their questions or perform tasks as requested.
 `;

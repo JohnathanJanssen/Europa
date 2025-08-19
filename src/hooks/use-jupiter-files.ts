@@ -30,6 +30,22 @@ export function useJupiterFiles() {
     setContent(content);
   };
 
+  const createDirectory = async (path: string) => {
+    await fetch(`${API}/directory`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    });
+  };
+
+  const renameFile = async (from: string, to: string) => {
+    await fetch(`${API}/file`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to }),
+    });
+  };
+
   const deleteFile = async (path: string) => {
     await fetch(`${API}/file?path=${encodeURIComponent(path)}`, {
       method: "DELETE",
@@ -44,6 +60,8 @@ export function useJupiterFiles() {
     listFiles,
     readFile,
     writeFile,
+    createDirectory,
+    renameFile,
     deleteFile,
     setContent,
     setCurrentPath,

@@ -69,7 +69,7 @@ const tools = [
     type: "function",
     function: {
       name: "write_file",
-      description: "Writes content to a file at a given path.",
+      description: "Writes content to a file at a given path. Creates the file if it doesn't exist.",
       parameters: {
         type: "object",
         properties: {
@@ -89,14 +89,52 @@ const tools = [
   {
     type: "function",
     function: {
-      name: "delete_file",
-      description: "Deletes a file at a given path.",
+      name: "create_directory",
+      description: "Creates a new directory at a given path. Can create parent directories if needed.",
       parameters: {
         type: "object",
         properties: {
           path: {
             type: "string",
-            description: "The path of the file to delete.",
+            description: "The path where the new directory should be created.",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rename_file",
+      description: "Renames or moves a file or directory.",
+      parameters: {
+        type: "object",
+        properties: {
+          from: {
+            type: "string",
+            description: "The original path of the file or directory.",
+          },
+          to: {
+            type: "string",
+            description: "The new path for the file or directory.",
+          },
+        },
+        required: ["from", "to"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "delete_file",
+      description: "Deletes a file or an entire directory (recursively) at a given path.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "The path of the file or directory to delete.",
           },
         },
         required: ["path"],

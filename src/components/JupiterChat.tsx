@@ -36,7 +36,7 @@ export const JupiterChat: React.FC = () => {
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
-  const { listFiles, readFile, writeFile, deleteFile } = useJupiterFiles();
+  const { listFiles, readFile, writeFile, deleteFile, createDirectory, renameFile } = useJupiterFiles();
 
   const toolImplementations = {
     run_command: runCommand,
@@ -44,6 +44,8 @@ export const JupiterChat: React.FC = () => {
     read_file: readFile,
     write_file: writeFile,
     delete_file: deleteFile,
+    create_directory: createDirectory,
+    rename_file: renameFile,
   };
 
   // Glow intensity for the widget border and aura

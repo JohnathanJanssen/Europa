@@ -43,10 +43,30 @@ app.post("/file", (req, res) => {
   });
 });
 
-// Delete a file
+// Create a directory
+app.post("/directory", (req, res) => {
+  const dirPath = path.join(ROOT, req.body.path || "");
+  fs.mkdir(dirPath, { recursive: true }, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Rename a file or directory
+app.put("/file", (req, res) => {
+  const oldPath = path.join(ROOT, req.body.from || "");
+  const newPath = path.join(ROOT, req.body.to || "");
+  fs.rename(oldPath, newPath, (err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.json({ success: true });
+  });
+});
+
+// Delete a file or directory
 app.delete("/file", (req, res) => {
-  const filePath = path.join(ROOT, req.query.path || "");
-  fs.unlink(filePath, (err) => {
+  const itemPath = path.join(ROOT, req.query.path || "");
+  // Use fs.rm for modern, recursive deletion of files and directories
+  fs.rm(itemPath, { recursive: true, force: true }, (err) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json({ success: true });
   });
