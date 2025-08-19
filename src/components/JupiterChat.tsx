@@ -10,6 +10,15 @@ import { useOpenAIChat } from "@/hooks/use-openai-chat";
 import { Waveform } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 
+const SETTINGS_KEY = "jupiter_settings";
+const defaultSettings = {
+  voice: "default",
+  model: "gpt-4",
+  wakeWord: false,
+  memoryLimit: 100,
+  privacy: true,
+};
+
 export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
@@ -17,10 +26,31 @@ export const JupiterChat: React.FC = () => {
   const [streamingAudioUrl, setStreamingAudioUrl] = useState<string | null>(null);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak, isSpeaking } = useJupiterTTS();
-  const { classifyEmotion, emotion, confidence } = useJupiterEmotion();
+  const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
   const waveformRef = useRef<HTMLCanvasElement>(null);
+
+  // Settings state
+  const [settings, setSettings] = useState(() => {
+    try {
+      const stored = localStorage.getItem(SETTINGS_KEY);
+      return stored ? { ...defaultSettings, ...JSON.parse(stored) } : defaultSettings;
+    } catch {
+      return defaultSettings;
+    }
+  });
+
+  // Watch for settings changes in localStorage (in case user changes them in another tab)
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === SETTINGS_KEY && e.newValue) {
+        setSettings({ ...defaultSettings, ...JSON.parse(e.newValue) });
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   // Track if we should send after recording
   const [pendingSend, setPendingSend] = useState(false);
@@ -57,17 +87,19 @@ export const JupiterChat: React.FC = () => {
     if (!text.trim()) return;
     setInput("");
     // Emotion classification
-    const emotionResult = await classifyEmotion(text);
-    // Send to Jupiter
+    await classifyEmotion(text);
+    // Send to Jupiter with selected model
     sendMessage({
       text,
+      model: settings.model === "gpt-3.5" ? "gpt-3.5-turbo" : (settings.model === "gpt-4" ? "gpt-4o" : settings.model),
       onStream: (partial: string) => {
         setStreamingReply(partial);
       },
       onDone: (final: string) => {
         setStreamingReply("");
         setStreamingAudioUrl(null);
-        speak(final);
+        // Pass selected voice to TTS (future extensibility)
+        speak(final, settings.voice);
       },
     });
   };
