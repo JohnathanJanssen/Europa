@@ -47,7 +47,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   // Glow intensity for the widget border and aura
-  const glowLevel = useGlowLevel(isRecording || isSpeaking);
+  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -132,15 +132,18 @@ export const JupiterChat: React.FC = () => {
       text,
       model: settings.model === "gpt-3.5" ? "gpt-3.5-turbo" : (settings.model === "gpt-4" ? "gpt-4o" : settings.model),
       toolImplementations,
-      onStream: (partial: string) => {
-        setStreamingReply(partial);
+      onStream: () => {
+        // Do nothing here to embody Jupiter's deliberate, non-streamed thought process.
       },
       onDone: (final: string) => {
         setStreamingReply("");
         setStreamingAudioUrl(null);
-        speak(final, settings.voice).catch(() => {
-          toast.error("Text-to-speech failed.");
-        });
+        // A deliberate pause before speaking, reflecting Jupiter's thoughtful nature.
+        setTimeout(() => {
+          speak(final, settings.voice).catch(() => {
+            toast.error("Text-to-speech failed.");
+          });
+        }, 500);
         toast.success("Response received.");
       },
     });
@@ -239,10 +242,14 @@ export const JupiterChat: React.FC = () => {
               </div>
             </div>
           ))}
-          {streamingReply && (
+          {isLoading && (
             <div className="flex justify-start">
-              <div className="rounded-2xl px-4 py-2 bg-gradient-to-r from-gray-800 via-gray-900 to-black text-blue-100 animate-pulse max-w-[80%] shadow">
-                {streamingReply}
+              <div className="rounded-2xl px-4 py-2 bg-gradient-to-r from-gray-800 via-gray-900 to-black text-blue-100 max-w-[80%] shadow">
+                <div className="flex items-center justify-center space-x-1.5 h-5">
+                  <span className="w-1.5 h-1.5 bg-blue-200 rounded-full animate-pulse [animation-delay:0s]"></span>
+                  <span className="w-1.5 h-1.5 bg-blue-200 rounded-full animate-pulse [animation-delay:0.2s]"></span>
+                  <span className="w-1.5 h-1.5 bg-blue-200 rounded-full animate-pulse [animation-delay:0.4s]"></span>
+                </div>
               </div>
             </div>
           )}
