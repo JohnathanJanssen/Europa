@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { CameraEye } from "./ui/CameraEye";
+import { useSpotlight } from '@/state/spotlight';
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -34,6 +35,7 @@ export const JupiterChat: React.FC = () => {
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading } = useOpenAIChat();
   const navigate = useNavigate();
+  const spotlight = useSpotlight();
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
@@ -50,7 +52,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   // Glow intensity for the widget border and aura
-  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || isVisionOpen);
+  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || spotlight.isOpen);
 
   // Force dark mode on mount
   useEffect(() => {
@@ -271,35 +273,28 @@ export const JupiterChat: React.FC = () => {
           )}
         </div>
         <div className="p-2 pt-0">
-          <Collapsible open={isVisionOpen} onOpenChange={setIsVisionOpen}>
-            <CollapsibleContent className="pb-2 animate-in slide-in-from-top-4">
-              <CameraEye onFileCaptured={handleFileForChat} />
-            </CollapsibleContent>
-            <div className="flex items-center gap-2">
-              <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
-                <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
-              </Button>
-              <CollapsibleTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Toggle Vision" className="rounded-full bg-gray-800 text-white shadow data-[state=open]:bg-blue-900 data-[state=open]:text-blue-300">
-                  <Eye />
-                </Button>
-              </CollapsibleTrigger>
-              <div className="flex-1 flex flex-col">
-                <Input
-                  className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
-                  placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
-                  disabled={isLoading}
-                  style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
-                />
-              </div>
-              <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
-                <Send />
-              </Button>
+          <div className="flex items-center gap-2">
+            <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
+              <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
+            </Button>
+            <Button variant="outline" size="icon" aria-label="Toggle Vision" className="rounded-full bg-gray-800 text-white shadow data-[state=open]:bg-blue-900 data-[state=open]:text-blue-300" onClick={() => spotlight.open('vision', null, 'Jupiter Vision')}>
+              <Eye />
+            </Button>
+            <div className="flex-1 flex flex-col">
+              <Input
+                className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
+                placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
+                disabled={isLoading}
+                style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
+              />
             </div>
-          </Collapsible>
+            <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
+              <Send />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
