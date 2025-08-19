@@ -160,9 +160,14 @@ export const JupiterChat: React.FC = () => {
   const displayMessages = messages.length > 0 ? messages : chatHistory;
 
   return (
-    <div className="flex flex-col h-[90vh] max-w-xl w-full mx-auto bg-transparent rounded-3xl shadow-2xl border border-[#2d2d4d] p-2 backdrop-blur-md">
-      <div className="flex items-center justify-between p-2">
-        <span className="text-xl font-bold text-white tracking-tight select-none" style={{ letterSpacing: 2 }}>JUPITER</span>
+    <div className="flex flex-col h-[70vh] max-w-md w-full mx-auto bg-black/60 backdrop-blur-xl rounded-2xl shadow-2xl border border-[#2d2d4d] p-2"
+      style={{
+        minWidth: 340,
+        boxShadow: "0 8px 32px 0 #000a, 0 1.5px 8px 0 #6366f133",
+      }}
+    >
+      <div className="flex items-center justify-between p-2 pb-0">
+        <span className="text-lg font-bold text-white tracking-widest select-none" style={{ letterSpacing: 3 }}>JUPITER</span>
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -184,7 +189,7 @@ export const JupiterChat: React.FC = () => {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent">
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-transparent">
         {displayMessages.map((msg: any) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
@@ -211,7 +216,7 @@ export const JupiterChat: React.FC = () => {
           </div>
         )}
       </div>
-      <div className="p-2 flex items-center gap-2">
+      <div className="p-2 pt-0 flex items-center gap-2">
         <Button
           variant={isRecording ? "destructive" : "outline"}
           size="icon"
@@ -232,10 +237,13 @@ export const JupiterChat: React.FC = () => {
               if (e.key === "Enter") handleSend(input);
             }}
             disabled={isLoading}
+            style={{
+              fontSize: 16,
+              background: "rgba(24,24,42,0.92)",
+              boxShadow: "0 1.5px 8px 0 #6366f122",
+            }}
           />
-          <div ref={waveformRef} className="mt-1">
-            <Waveform isActive={isRecording || isSpeaking} />
-          </div>
+          <Waveform isActive={isRecording || isSpeaking} />
         </div>
         <Button
           onClick={() => handleSend(input)}
