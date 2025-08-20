@@ -57,7 +57,7 @@ export function createVisionEngine(): VisionEngine {
   let listeners: ((dets: Detection[]) => void)[] = [];
   let isRunning = false;
   let modelName: keyof typeof models = 'yolov5n';
-  let executionProvider = 'wasm';
+  let executionProvider = 'wasm'; // Default to wasm
 
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -67,14 +67,16 @@ export function createVisionEngine(): VisionEngine {
     try {
       ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/";
       const modelUrl = getModelUrl(modelName);
-      const availableProviders = ort.env.backends as any; // Cast to any to access properties
-      executionProvider = availableProviders.webgpu ? 'webgpu' : availableProviders.webgl ? 'webgl' : 'wasm';
+      console.log(`Attempting to load model from: ${modelUrl}`); // Log the model URL
+      
+      // Force executionProvider to 'wasm' for maximum compatibility
+      executionProvider = 'wasm'; 
       
       session = await ort.InferenceSession.create(modelUrl, {
         executionProviders: [executionProvider],
         graphOptimizationLevel: 'all',
       });
-      console.log(`VisionEngine initialized with ${executionProvider}.`); // Use the local variable
+      console.log(`VisionEngine initialized with ${executionProvider}.`);
     } catch (e) {
       console.error("Failed to initialize VisionEngine:", e);
       throw new Error("Could not load the vision model.");
