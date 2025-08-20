@@ -1,5 +1,5 @@
 import * as ort from 'onnxruntime-web';
-import { models } from './models';
+import { models, getModelUrl } from './models'; // Import getModelUrl
 
 export type Detection = {
   cls: string;
@@ -67,14 +67,14 @@ export function createVisionEngine(): VisionEngine {
     try {
       ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/";
       const modelUrl = getModelUrl(modelName);
-      const availableProviders = ort.env.backends;
+      const availableProviders = ort.env.backends as any; // Cast to any to access properties
       executionProvider = availableProviders.webgpu ? 'webgpu' : availableProviders.webgl ? 'webgl' : 'wasm';
       
       session = await ort.InferenceSession.create(modelUrl, {
         executionProviders: [executionProvider],
         graphOptimizationLevel: 'all',
       });
-      console.log(`VisionEngine initialized with ${session.executionProvider}.`);
+      console.log(`VisionEngine initialized with ${executionProvider}.`); // Use the local variable
     } catch (e) {
       console.error("Failed to initialize VisionEngine:", e);
       throw new Error("Could not load the vision model.");

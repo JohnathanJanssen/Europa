@@ -2,21 +2,21 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom"; // Changed to BrowserRouter
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import { JupiterChat } from "@/components/JupiterChat";
 import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
-import { Router } from "react-router-dom";
 import { SpotlightDock } from './components/ui/SpotlightDock';
 import { SpotlightProvider } from './state/spotlight';
+import { ThemeProvider } from "next-themes"; // Added ThemeProvider import
 
 const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Router>
+    <BrowserRouter> {/* Changed to BrowserRouter */}
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <SpotlightProvider>
           <div className="min-h-screen bg-background font-sans antialiased">
@@ -34,7 +34,7 @@ function App() {
           </div>
         </SpotlightProvider>
       </ThemeProvider>
-    </Router>
+    </BrowserRouter>
   );
 }
 

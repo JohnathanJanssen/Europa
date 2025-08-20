@@ -12,7 +12,6 @@ import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { CameraEye } from "./ui/CameraEye";
 import { useSpotlight } from '@/state/spotlight';
 
 const SETTINGS_KEY = "jupiter_settings";
@@ -29,7 +28,6 @@ export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [isRecording, setIsRecording] = useState(false);
   const [isDropping, setIsDropping] = useState(false);
-  const [isVisionOpen, setIsVisionOpen] = useState(false);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion } = useJupiterEmotion();
