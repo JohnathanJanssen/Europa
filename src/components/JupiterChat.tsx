@@ -14,6 +14,9 @@ import { toast } from "sonner";
 import { useSpotlight } from '@/state/spotlight';
 import { SpotlightCard } from '@/components/SpotlightCard';
 import { AnimatePresence, motion } from 'framer-motion';
+import { chat, type Msg } from '../runtime/brain.ts';
+import { speak } from '../runtime/voice.ts';
+import { startListening } from '../runtime/listen.ts';
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -30,9 +33,9 @@ export const JupiterChat: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isDropping, setIsDropping] = useState(false);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
-  const { speak, isSpeaking } = useJupiterTTS();
+  const { speak: ttsSpeak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion } = useJupiterEmotion();
-  const { sendMessage, messages, isLoading } = useOpenAIChat();
+  const { sendMessage, messages, isLoading: openAiIsLoading } = useOpenAIChat();
   const navigate = useNavigate();
   const spotlight = useSpotlight();
 
@@ -47,9 +50,10 @@ export const JupiterChat: React.FC = () => {
     write_file: writeFile,
     delete_file: deleteFile,
     create_directory: createDirectory,
-    rename_file: renameFile,
+    rename_file: rename_file,
   };
 
+  const [isLoading, setIsLoading] = useState(false);
   const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || spotlight.isVisible);
 
   useEffect(() => {
@@ -68,7 +72,7 @@ export const JupiterChat: React.FC = () => {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [spotlight]);
 
   const [settings, setSettings] = useState(() => {
@@ -80,7 +84,7 @@ export const JupiterChat: React.FC = () => {
     }
   });
 
-  const [chatHistory, setChatHistory] = useState(() => {
+  const [chatHistory, setChatHistory] = useState<(Msg & { id: string, imageUrl?: string })[]>(() => {
     try {
       const stored = localStorage.getItem(CHAT_HISTORY_KEY);
       return stored ? JSON.parse(stored) : [];
@@ -103,54 +107,62 @@ export const JupiterChat: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    setChatHistory(messages);
-    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
-  }, [messages]);
+    localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory));
+  }, [chatHistory]);
 
   const [pendingSend, setPendingSend] = useState(false);
 
-  const handleMicDown = () => {
-    setIsRecording(true);
-    startRecording();
-  };
-  const handleMicUp = async () => {
-    setIsRecording(false);
-    await stopRecording();
-    setPendingSend(true);
-  };
+  const [listenerCtrl, setListenerCtrl] = useState<{ stop: () => void } | null>(null);
 
-  useEffect(() => {
-    if (pendingSend && audioBlob && !isRecording && !isTranscribing) {
-      const text = transcript || "";
-      setInput(text);
-      if (!text) {
-        toast.error("Speech recognition failed. Please try again.");
-      } else {
-        handleSend(text);
-      }
-      setPendingSend(false);
+  async function sendAndSpeak(text: string, imageUrl?: string) {
+    if (!text.trim() && !imageUrl) return;
+    setInput("");
+
+    const userMessage: (Msg & { id: string, imageUrl?: string }) = {
+      role: 'user',
+      content: text,
+      id: Date.now().toString(),
+      imageUrl,
+    };
+
+    const newHistory = [...chatHistory, userMessage];
+    setChatHistory(newHistory);
+    setIsLoading(true);
+
+    try {
+      const historyForApi = newHistory.map(({ role, content }) => ({ role, content }));
+      const reply = await chat(historyForApi);
+      await speak(reply);
+      const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: reply, id: (Date.now() + 1).toString() };
+      setChatHistory(prev => [...prev, assistantMessage]);
+    } catch (e) {
+      console.error(e);
+      toast.error("I was unable to get a reply. Please check your API keys.");
+    } finally {
+      setIsLoading(false);
     }
-  }, [pendingSend, audioBlob, transcript, isRecording, isTranscribing]);
+  }
+
+  const handleMicClick = () => {
+    if (listenerCtrl) {
+      listenerCtrl.stop();
+      setListenerCtrl(null);
+      setIsRecording(false);
+    } else {
+      setIsRecording(true);
+      const ctrl = startListening(async (heard) => {
+        ctrl.stop();
+        setListenerCtrl(null);
+        setIsRecording(false);
+        await sendAndSpeak(heard);
+      });
+      setListenerCtrl(ctrl);
+    }
+  };
 
   const handleSend = async (text: string, imageUrl?: string) => {
     if (!text.trim() && !imageUrl) return;
-    setInput("");
-    await classifyEmotion(text);
-    sendMessage({
-      text,
-      imageUrl,
-      model: settings.model === "gpt-3.5" ? "gpt-3.5-turbo" : (settings.model === "gpt-4" ? "gpt-4o" : settings.model),
-      toolImplementations,
-      onStream: () => {},
-      onDone: (final: string) => {
-        setTimeout(() => {
-          speak(final).catch(() => {
-            toast.error("Text-to-speech failed.");
-          });
-        }, 500);
-        toast.success("Response received.");
-      },
-    });
+    await sendAndSpeak(text, imageUrl);
   };
 
   const handleFileForChat = (file: File) => {
@@ -177,7 +189,6 @@ export const JupiterChat: React.FC = () => {
   const handleClearChat = () => {
     setChatHistory([]);
     localStorage.removeItem(CHAT_HISTORY_KEY);
-    window.location.reload();
     toast.success("Chat history cleared.");
   };
 
@@ -207,7 +218,7 @@ export const JupiterChat: React.FC = () => {
     }
   };
 
-  const displayMessages = messages.length > 0 ? messages : chatHistory;
+  const displayMessages = chatHistory;
 
   const blue = [129, 140, 248];
   const purple = [168, 28, 175];
@@ -263,7 +274,7 @@ export const JupiterChat: React.FC = () => {
                   }`}
                 >
                   {msg.imageUrl && <img src={msg.imageUrl} alt="User content" className="rounded-lg mb-2 max-w-full h-auto" />}
-                  <div>{msg.text}</div>
+                  <div>{msg.content || msg.text}</div>
                 </div>
               </div>
             ))}
@@ -281,7 +292,7 @@ export const JupiterChat: React.FC = () => {
           </div>
           <div className="p-2 pt-0">
             <div className="flex items-center gap-2">
-              <Button variant={isRecording ? "destructive" : "outline"} size="icon" onMouseDown={handleMicDown} onMouseUp={handleMicUp} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
+              <Button variant={isRecording ? "destructive" : "outline"} size="icon" onClick={handleMicClick} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
                 <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
               </Button>
               <Button variant="outline" size="icon" aria-label="Toggle Vision" data-state={spotlight.panels.some(p => p.type === 'vision') ? 'open' : 'closed'} className="rounded-full bg-gray-800 text-white shadow data-[state=open]:bg-blue-900 data-[state=open]:text-blue-300" onClick={handleVisionToggle}>
