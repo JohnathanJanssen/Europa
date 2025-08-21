@@ -65,9 +65,10 @@ export function createVisionEngine(): VisionEngine {
   async function initialize() {
     if (session) return;
     try {
-      ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.0/dist/";
+      // Update WASM paths to match the installed onnxruntime-web version
+      ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.22.0/dist/";
       const modelUrl = getModelUrl(modelName);
-      console.log(`Attempting to load model from: ${modelUrl}`); // Log the model URL
+      console.log(`Attempting to load model from: ${modelUrl}`);
       
       // Force executionProvider to 'wasm' for maximum compatibility
       executionProvider = 'wasm'; 
