@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useVision } from '@/hooks/use-vision';
 import { Button } from './button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './select';
-import { Video, VideoOff, ScanText, AlertCircle } from 'lucide-react';
+import { Video, VideoOff, ScanText, AlertCircle, Smartphone, Camera } from 'lucide-react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export const VisionPanel: React.FC = () => {
   const {
@@ -11,7 +11,6 @@ export const VisionPanel: React.FC = () => {
     getVideoDevices,
     startCamera,
     stopCamera,
-    startVision,
     runOcr,
     detections,
     isCameraActive,
@@ -22,32 +21,30 @@ export const VisionPanel: React.FC = () => {
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | undefined>();
 
-  useEffect(() => {
-    async function loadDevices() {
-      const videoDevices = await getVideoDevices();
-      setDevices(videoDevices);
-      if (videoDevices.length > 0) {
-        const defaultDevice = videoDevices.find(d => d.label.toLowerCase().includes('back')) || videoDevices[0];
-        setSelectedDeviceId(defaultDevice.deviceId);
-      }
+  const loadDevices = useCallback(async () => {
+    const videoDevices = await getVideoDevices();
+    setDevices(videoDevices);
+    if (!selectedDeviceId && videoDevices.length > 0) {
+      const defaultDevice = videoDevices.find(d => d.label.toLowerCase().includes('back')) || videoDevices[0];
+      setSelectedDeviceId(defaultDevice.deviceId);
     }
-    loadDevices();
-  }, [getVideoDevices]);
+  }, [getVideoDevices, selectedDeviceId]);
 
   useEffect(() => {
-    if (isCameraActive && !isVisionActive) {
-      startVision();
-    }
-  }, [isCameraActive, isVisionActive, startVision]);
+    loadDevices();
+  }, [loadDevices]);
 
   const handleStart = () => {
-    startCamera(selectedDeviceId);
+    if (selectedDeviceId) {
+      startCamera(selectedDeviceId);
+    } else {
+      toast.error("No camera selected.");
+    }
   };
 
-  const handleDeviceChange = (deviceId: string) => {
+  const handleDeviceSelect = (deviceId: string) => {
     setSelectedDeviceId(deviceId);
     if (isCameraActive) {
-      // Restart camera with new device
       startCamera(deviceId);
     }
   };
@@ -57,10 +54,17 @@ export const VisionPanel: React.FC = () => {
     const text = await runOcr();
     if (text) {
       toast.success("OCR complete. Context updated.");
-      console.log("OCR Result:", text);
     } else {
       toast.error("OCR could not find any text.");
     }
+  };
+
+  const getDeviceIcon = (label: string) => {
+    const lowerLabel = label.toLowerCase();
+    if (lowerLabel.includes('iphone') || lowerLabel.includes('continuity')) {
+      return <Smartphone size={16} />;
+    }
+    return <Camera size={16} />;
   };
 
   return (
@@ -71,12 +75,7 @@ export const VisionPanel: React.FC = () => {
           <div
             key={i}
             className="absolute border-2 border-cyan-400/80"
-            style={{
-              left: det.box[0],
-              top: det.box[1],
-              width: det.box[2],
-              height: det.box[3],
-            }}
+            style={{ left: det.box[0], top: det.box[1], width: det.box[2], height: det.box[3] }}
           >
             <span className="absolute -top-6 left-0 bg-cyan-400/80 text-black text-xs px-1 py-0.5 rounded">
               {det.cls} ({Math.round(det.score * 100)}%)
@@ -91,37 +90,46 @@ export const VisionPanel: React.FC = () => {
         )}
       </div>
       {error && (
-        <div className="p-2 bg-red-900/50 text-red-300 flex items-center gap-2">
+        <div className="p-2 bg-red-900/50 text-red-300 flex items-center gap-2 text-xs">
           <AlertCircle size={16} /> {error}
         </div>
       )}
-      <div className="p-2 border-t border-gray-700 flex flex-col gap-2">
-        <div className="flex gap-2">
+      <div className="p-2 border-t border-gray-700/50 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
           {!isCameraActive ? (
-            <Button onClick={handleStart} className="flex-1" disabled={!selectedDeviceId}>
-              <Video className="mr-2" /> Start Vision
+            <Button onClick={handleStart} size="sm" className="flex-1" disabled={devices.length === 0}>
+              <Video className="mr-2" /> Start
             </Button>
           ) : (
-            <Button onClick={stopCamera} variant="destructive" className="flex-1">
-              <VideoOff className="mr-2" /> Stop Vision
+            <Button onClick={stopCamera} size="sm" variant="destructive" className="flex-1">
+              <VideoOff className="mr-2" /> Stop
             </Button>
           )}
-          <Button onClick={handleOcr} disabled={!isCameraActive} variant="outline">
-            <ScanText className="mr-2" /> Run OCR
+          <Button onClick={handleOcr} size="sm" disabled={!isCameraActive} variant="outline">
+            <ScanText className="mr-2" /> OCR
           </Button>
         </div>
-        <Select onValueChange={handleDeviceChange} value={selectedDeviceId} disabled={devices.length === 0}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a camera..." />
-          </SelectTrigger>
-          <SelectContent>
+        <div className="flex items-center gap-1">
+          <TooltipProvider>
             {devices.map(device => (
-              <SelectItem key={device.deviceId} value={device.deviceId}>
-                {device.label || `Camera ${devices.indexOf(device) + 1}`}
-              </SelectItem>
+              <Tooltip key={device.deviceId} delayDuration={100}>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => handleDeviceSelect(device.deviceId)}
+                    className={`h-8 w-8 ${selectedDeviceId === device.deviceId ? 'bg-blue-900/80 text-blue-300' : 'text-gray-400'}`}
+                  >
+                    {getDeviceIcon(device.label)}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{device.label || `Camera ${devices.indexOf(device) + 1}`}</p>
+                </TooltipContent>
+              </Tooltip>
             ))}
-          </SelectContent>
-        </Select>
+          </TooltipProvider>
+        </div>
       </div>
     </div>
   );

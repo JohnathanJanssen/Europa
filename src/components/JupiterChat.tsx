@@ -12,7 +12,7 @@ import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useSpotlight } from '@/state/spotlight';
-import { SpotlightView } from '@/components/SpotlightView';
+import { SpotlightCard } from '@/components/SpotlightCard';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const SETTINGS_KEY = "jupiter_settings";
@@ -50,12 +50,26 @@ export const JupiterChat: React.FC = () => {
     rename_file: renameFile,
   };
 
-  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || spotlight.isOpen);
+  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || spotlight.isVisible);
 
   useEffect(() => {
     document.body.classList.add("dark");
     return () => document.body.classList.remove("dark");
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        spotlight.setVisible(false);
+      }
+      if (e.key.toLowerCase() === 'l' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        spotlight.toggle();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [spotlight]);
 
   const [settings, setSettings] = useState(() => {
     try {
@@ -185,11 +199,13 @@ export const JupiterChat: React.FC = () => {
   };
 
   const handleVisionToggle = () => {
+    // This is now a request for Jupiter to handle.
+    // For now, we'll just open it directly.
     const visionPanel = spotlight.panels.find(p => p.type === 'vision');
     if (visionPanel) {
       spotlight.close(visionPanel.id);
     } else {
-      spotlight.open('vision', null, 'Jupiter Vision');
+      spotlight.open('vision', null, 'Vision');
     }
   };
 
@@ -202,8 +218,6 @@ export const JupiterChat: React.FC = () => {
     `rgba(${Math.round(lerp(blue[0], purple[0], t))},${Math.round(
       lerp(blue[1], purple[1], t)
     )},${Math.round(lerp(blue[2], purple[2], t))},${0.18 + glowLevel * 0.32})`;
-
-  const isSpotlightVisible = spotlight.isOpen && spotlight.panels.length > 0;
 
   return (
     <div className="relative flex items-center justify-center min-h-[70vh] py-10">
@@ -225,7 +239,7 @@ export const JupiterChat: React.FC = () => {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative z-10 flex flex-col w-full bg-black/60 backdrop-blur-xl shadow-2xl border transition-all duration-300 ${isDropping ? 'border-green-400' : 'border-[#2d2d4d]'} ${isSpotlightVisible ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
+          className={`relative z-10 flex flex-col w-full bg-black/60 backdrop-blur-xl shadow-2xl border transition-all duration-300 ${isDropping ? 'border-green-400' : 'border-[#2d2d4d]'} ${spotlight.isVisible ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
           style={{
             minWidth: 340,
             boxShadow: `0 8px 32px 0 #000a, 0 1.5px 8px 0 #6366f133, 0 0 32px ${24 + glowLevel * 32}px ${colorMix(glowLevel)}`,
@@ -293,7 +307,7 @@ export const JupiterChat: React.FC = () => {
           </div>
         </div>
         <AnimatePresence>
-          {isSpotlightVisible && (
+          {spotlight.isVisible && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
@@ -301,7 +315,7 @@ export const JupiterChat: React.FC = () => {
               transition={{ duration: 0.3, ease: 'easeInOut' }}
               className="w-full"
             >
-              <SpotlightView />
+              <SpotlightCard />
             </motion.div>
           )}
         </AnimatePresence>
