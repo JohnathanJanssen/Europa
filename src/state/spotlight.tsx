@@ -36,7 +36,9 @@ export const SpotlightProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     setPanels(prev => {
       // Prevent duplicate vision panels
       if (type === 'vision' && prev.some(p => p.type === 'vision')) {
-        return prev;
+        const existing = prev.find(p => p.type === 'vision')!;
+        const others = prev.filter(p => p.type !== 'vision');
+        return [...others, existing]; // Move to front
       }
       return [...prev, newPanel];
     });
@@ -45,7 +47,13 @@ export const SpotlightProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   };
 
   const close = (id: string) => {
-    setPanels(prev => prev.filter(p => p.id !== id));
+    setPanels(prev => {
+      const newPanels = prev.filter(p => p.id !== id);
+      if (newPanels.length === 0) {
+        setIsOpen(false); // Also close the dock if no panels are left
+      }
+      return newPanels;
+    });
   };
 
   const focus = (id: string) => {
@@ -55,9 +63,13 @@ export const SpotlightProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const otherPanels = prev.filter(p => p.id !== id);
       return [...otherPanels, panelToFocus];
     });
+    setIsOpen(true);
   };
 
-  const toggle = () => setIsOpen(prev => !prev);
+  const toggle = () => {
+    // Only toggle open if there are panels to show
+    setIsOpen(prev => (panels.length > 0 ? !prev : false));
+  };
 
   return (
     <SpotlightContext.Provider value={{ panels, open, close, focus, isOpen, toggle }}>
