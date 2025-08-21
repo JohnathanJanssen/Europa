@@ -50,7 +50,7 @@ export const JupiterChat: React.FC = () => {
     write_file: writeFile,
     delete_file: deleteFile,
     create_directory: createDirectory,
-    rename_file: rename_file,
+    rename_file: renameFile,
   };
 
   const [isLoading, setIsLoading] = useState(false);
