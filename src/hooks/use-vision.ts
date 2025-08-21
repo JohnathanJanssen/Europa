@@ -11,13 +11,29 @@ export function useVision() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isVisionActive, setIsVisionActive] = useState(false);
 
-  const startCamera = useCallback(async () => {
-    if (isCameraActive) return;
+  const getVideoDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      return devices.filter(device => device.kind === 'videoinput');
+    } catch (err) {
+      setError("Could not enumerate media devices.");
+      return [];
+    }
+  }, []);
+
+  const startCamera = useCallback(async (deviceId?: string) => {
+    if (isCameraActive) stopCamera(); // Stop any existing stream
     setError(null);
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
-      });
+      const constraints: MediaStreamConstraints = {
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: deviceId ? undefined : 'environment',
+        },
+      };
+      const mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
       setStream(mediaStream);
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
@@ -69,7 +85,6 @@ export function useVision() {
   }, [engine]);
 
   useEffect(() => {
-    // Cleanup on unmount
     return () => {
       stopCamera();
     };
@@ -77,6 +92,7 @@ export function useVision() {
 
   return {
     videoRef,
+    getVideoDevices,
     startCamera,
     stopCamera,
     startVision,

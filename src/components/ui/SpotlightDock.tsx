@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSpotlight } from '@/state/spotlight';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
 import { VisionPanel } from './VisionPanel';
@@ -15,7 +15,27 @@ const PanelContent: React.FC<{ type: string }> = ({ type }) => {
 };
 
 export const SpotlightDock: React.FC = () => {
-  const { isOpen, panels, close } = useSpotlight();
+  const { isOpen, panels, close, toggle, focus } = useSpotlight();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'l' && (e.metaKey || e.ctrlKey) && e.shiftKey) {
+        e.preventDefault();
+        toggle();
+      }
+
+      if ((e.metaKey || e.ctrlKey) && e.key >= '1' && e.key <= '9') {
+        const panelIndex = parseInt(e.key, 10) - 1;
+        if (panels[panelIndex]) {
+          e.preventDefault();
+          focus(panels[panelIndex].id);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [toggle, focus, panels]);
 
   if (!isOpen || panels.length === 0) {
     return null;
@@ -38,7 +58,6 @@ export const SpotlightDock: React.FC = () => {
                 ))}
               </div>
               <div className="flex-1 overflow-hidden">
-                {/* For now, only show the last focused panel */}
                 {panels.length > 0 && <PanelContent type={panels[panels.length - 1].type} />}
               </div>
             </div>
