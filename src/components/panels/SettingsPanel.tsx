@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { webSpeechAvailable } from '../../runtime/cap';
 
 const voices = [
   { id: "elevenlabs-1", name: "ElevenLabs - Ava" },
@@ -34,6 +35,7 @@ const defaultSettings: SettingsType = {
 
 export function SettingsPanel() {
   const [settings, setSettings] = useState<SettingsType>(defaultSettings);
+  const wakeSupported = webSpeechAvailable();
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -78,7 +80,10 @@ export function SettingsPanel() {
       </div>
       <div className="flex items-center justify-between">
         <Label className="text-gray-300">Wake Word</Label>
-        <Switch checked={settings.wakeWord} onCheckedChange={val => setSettings(s => ({ ...s, wakeWord: val }))} />
+        <div className="flex items-center">
+          <Switch disabled={!wakeSupported} checked={settings.wakeWord} onCheckedChange={val => setSettings(s => ({ ...s, wakeWord: val }))} />
+          {!wakeSupported && <span className="text-xs opacity-60 ml-2">Not supported in this browser</span>}
+        </div>
       </div>
       <div>
         <Label className="text-gray-300">Memory Limit (messages)</Label>

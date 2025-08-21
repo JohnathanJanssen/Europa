@@ -21,6 +21,8 @@ import { startWakeWord, type WakeCtrl } from '../runtime/wake.ts';
 import { registerSpotlight, type Panel } from '../runtime/ui.ts';
 import { matchAction, performAction } from '../runtime/actions.ts';
 import { PanelType } from '@/state/spotlight'; // Import PanelType for mapping
+import { webSpeechAvailable, getMicPermission } from '../runtime/cap.ts';
+import { startRecording, transcribeOnce, type RecorderCtrl } from '../runtime/stt_hf.ts';
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -35,10 +37,12 @@ const defaultSettings = {
 export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [micOn, setMicOn] = useState(false);
+  const [micState, setMicState] = useState<'idle'|'listening'|'recording'|'transcribing'>('idle');
   const wakeCtrlRef = React.useRef<WakeCtrl | null>(null);
+  const recRef = React.useRef<RecorderCtrl | null>(null);
   const listenCtrlRef = React.useRef<ListenCtrl | null>(null);
   const [isDropping, setIsDropping] = useState(false);
-  const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
+  const { startRecording: asrStartRecording, stopRecording: asrStopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak: ttsSpeak, isSpeaking } = useJupiterTTS();
   const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading: openAiIsLoading } = useOpenAIChat();
@@ -134,7 +138,7 @@ export const JupiterChat: React.FC = () => {
 
   const [pendingSend, setPendingSend] = useState(false);
 
-  async function sendAndSpeak(text: string, imageUrl?: string) {
+  async function handleUserText(text: string, imageUrl?: string) {
     if (!text.trim() && !imageUrl) return;
     setInput("");
 
@@ -170,37 +174,62 @@ export const JupiterChat: React.FC = () => {
   }
 
   const onMicToggle = async () => {
-    const next = !micOn;
-    setMicOn(next);
-    if (!next) {
-      wakeCtrlRef.current?.stop();
-      listenCtrlRef.current?.stop();
-      wakeCtrlRef.current = null;
-      listenCtrlRef.current = null;
+    // Turning OFF:
+    if (micOn) {
+      setMicOn(false);
+      setMicState('idle');
+      try { wakeCtrlRef.current?.stop(); wakeCtrlRef.current = null; } catch {}
+      try { listenCtrlRef.current?.stop(); listenCtrlRef.current = null; } catch {}
+      try {
+        if (recRef.current) {
+          setMicState('transcribing');
+          const blob = await recRef.current.stop();
+          recRef.current = null;
+          const text = await transcribeOnce(blob);
+          setMicState('idle');
+          if (text) await handleUserText(text);
+        }
+      } catch(e) {
+        setMicState('idle');
+        console.error(e);
+        toast.error("Could not transcribe audio. Check HF token.");
+      }
       return;
     }
 
-    if (settings.wakeWord) {
-      // Always-on wake word: say "Jupiter" then the command
+    // Turning ON:
+    const allow = await getMicPermission();
+    if (allow === 'denied') {
+      toast.error('Microphone is blocked. Please allow it in your browser settings.');
+      return;
+    }
+
+    setMicOn(true);
+    if (webSpeechAvailable() && settings.wakeWord) {
+      setMicState('listening');
       wakeCtrlRef.current = startWakeWord(async (utterance) => {
-        await sendAndSpeak(utterance);
+        await handleUserText(utterance);
       }, {
         onHeard: (_t, _f) => {}, // keep quiet; Jupiter speaks only when relevant
       });
-    } else {
-      // Plain STT: whatever you say becomes a command
-      listenCtrlRef.current = startListening(async (text, final) => {
-        if (!final) return;
-        listenCtrlRef.current?.stop();
-        setMicOn(false);
-        await sendAndSpeak(text);
-      });
+      return;
+    }
+    
+    // Fallback push-to-talk:
+    setMicState('recording');
+    try {
+      recRef.current = await startRecording();
+    } catch (e) {
+      console.error(e);
+      toast.error("Could not start recording. Is the mic connected?");
+      setMicOn(false);
+      setMicState('idle');
     }
   };
 
   const handleSend = async (text: string, imageUrl?: string) => {
     if (!text.trim() && !imageUrl) return;
-    await sendAndSpeak(text, imageUrl);
+    await handleUserText(text, imageUrl);
   };
 
   const handleFileForChat = (file: File) => {
@@ -337,15 +366,24 @@ export const JupiterChat: React.FC = () => {
                 <Eye />
               </Button>
               <div className="flex-1 flex flex-col">
-                <Input
-                  className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600"
-                  placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
-                  disabled={isLoading}
-                  style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
-                />
+                <div className="relative flex items-center">
+                  <Input
+                    className="bg-[#18182a] text-white rounded-full border border-[#2d2d4d] px-4 py-2 focus:ring-2 focus:ring-blue-600 w-full"
+                    placeholder={isDropping ? "Drop file to analyze" : "Type or drop a file…"}
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
+                    disabled={isLoading}
+                    style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122", paddingRight: micState !== 'idle' ? '110px' : '1rem' }}
+                  />
+                  {micState !== 'idle' && (
+                    <span className="absolute right-3 text-xs opacity-70 pointer-events-none">
+                      {micState === 'listening' ? 'Listening…' :
+                       micState === 'recording' ? 'Recording…' :
+                       'Transcribing…'}
+                    </span>
+                  )}
+                </div>
               </div>
               <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
                 <Send />
