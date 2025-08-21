@@ -199,8 +199,6 @@ export const JupiterChat: React.FC = () => {
   };
 
   const handleVisionToggle = () => {
-    // This is now a request for Jupiter to handle.
-    // For now, we'll just open it directly.
     const visionPanel = spotlight.panels.find(p => p.type === 'vision');
     if (visionPanel) {
       spotlight.close(visionPanel.id);
@@ -250,8 +248,8 @@ export const JupiterChat: React.FC = () => {
             <span className="text-lg font-bold text-white tracking-widest select-none" style={{ letterSpacing: 3 }}>JUPITER</span>
             <div className="flex gap-2">
               <Button variant="ghost" size="icon" onClick={handleClearChat} aria-label="Clear Chat" title="Clear Chat" className="text-gray-400 hover:text-pink-400"><Trash2 /></Button>
-              <Button variant="ghost" size="icon" onClick={() => navigate("/tools")} className="text-gray-400 hover:text-green-400" title="Open Tools" aria-label="Open Tools"><Terminal /></Button>
-              <Button variant="ghost" size="icon" onClick={() => navigate("/settings")} className="text-gray-400 hover:text-blue-400"><Settings /></Button>
+              <Button variant="ghost" size="icon" onClick={() => spotlight.open('terminal', null, 'Terminal')} className="text-gray-400 hover:text-green-400" title="Open Terminal" aria-label="Open Terminal"><Terminal /></Button>
+              <Button variant="ghost" size="icon" onClick={() => spotlight.open('settings', null, 'Settings')} className="text-gray-400 hover:text-blue-400" title="Open Settings" aria-label="Open Settings"><Settings /></Button>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-transparent max-h-[50vh]">
