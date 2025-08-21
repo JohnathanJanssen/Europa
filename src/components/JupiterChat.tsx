@@ -18,6 +18,9 @@ import { chat, type Msg } from '../runtime/brain.ts';
 import { speak } from '../runtime/voice.ts';
 import { startListening, type ListenCtrl } from '../runtime/listen.ts';
 import { startWakeWord, type WakeCtrl } from '../runtime/wake.ts';
+import { registerSpotlight, type Panel } from '../runtime/ui.ts';
+import { matchAction, performAction } from '../runtime/actions.ts';
+import { PanelType } from '@/state/spotlight'; // Import PanelType for mapping
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -41,6 +44,22 @@ export const JupiterChat: React.FC = () => {
   const { sendMessage, messages, isLoading: openAiIsLoading } = useOpenAIChat();
   const navigate = useNavigate();
   const spotlight = useSpotlight();
+
+  useEffect(() => {
+    registerSpotlight({
+      open(panel?: Panel) {
+        if (panel === 'home' || !panel) {
+          spotlight.setVisible(true);
+        } else {
+          // Cast Panel to PanelType as they align for 'settings', 'terminal', 'vision'
+          spotlight.open(panel as PanelType, null, panel.charAt(0).toUpperCase() + panel.slice(1));
+        }
+      },
+      close() {
+        spotlight.setVisible(false);
+      }
+    });
+  }, [spotlight]);
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
@@ -118,6 +137,12 @@ export const JupiterChat: React.FC = () => {
   async function sendAndSpeak(text: string, imageUrl?: string) {
     if (!text.trim() && !imageUrl) return;
     setInput("");
+
+    const action = matchAction(text);
+    if (action) {
+      await performAction(action);
+      return; // Do not send to LLM if an action was performed
+    }
 
     const userMessage: (Msg & { id: string, imageUrl?: string }) = {
       role: 'user',

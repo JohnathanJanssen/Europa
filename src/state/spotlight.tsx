@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 import { nanoid } from 'nanoid';
 
-type PanelType = 'vision' | 'file' | 'code' | 'note' | 'settings' | 'terminal';
+export type PanelType = 'vision' | 'file' | 'code' | 'note' | 'settings' | 'terminal';
 
 export interface Panel {
   id: string;
