@@ -16,7 +16,8 @@ import { SpotlightCard } from '@/components/SpotlightCard';
 import { AnimatePresence, motion } from 'framer-motion';
 import { chat, type Msg } from '../runtime/brain.ts';
 import { speak } from '../runtime/voice.ts';
-import { startListening } from '../runtime/listen.ts';
+import { startListening, type ListenCtrl } from '../runtime/listen.ts';
+import { startWakeWord, type WakeCtrl } from '../runtime/wake.ts';
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -30,7 +31,9 @@ const defaultSettings = {
 
 export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
-  const [isRecording, setIsRecording] = useState(false);
+  const [micOn, setMicOn] = useState(false);
+  const wakeCtrlRef = React.useRef<WakeCtrl | null>(null);
+  const listenCtrlRef = React.useRef<ListenCtrl | null>(null);
   const [isDropping, setIsDropping] = useState(false);
   const { startRecording, stopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak: ttsSpeak, isSpeaking } = useJupiterTTS();
@@ -54,7 +57,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   const [isLoading, setIsLoading] = useState(false);
-  const glowLevel = useGlowLevel(isRecording || isSpeaking || isLoading || spotlight.isVisible);
+  const glowLevel = useGlowLevel(micOn || isSpeaking || isLoading || spotlight.isVisible);
 
   useEffect(() => {
     document.body.classList.add("dark");
@@ -112,8 +115,6 @@ export const JupiterChat: React.FC = () => {
 
   const [pendingSend, setPendingSend] = useState(false);
 
-  const [listenerCtrl, setListenerCtrl] = useState<{ stop: () => void } | null>(null);
-
   async function sendAndSpeak(text: string, imageUrl?: string) {
     if (!text.trim() && !imageUrl) return;
     setInput("");
@@ -143,20 +144,32 @@ export const JupiterChat: React.FC = () => {
     }
   }
 
-  const handleMicClick = () => {
-    if (listenerCtrl) {
-      listenerCtrl.stop();
-      setListenerCtrl(null);
-      setIsRecording(false);
-    } else {
-      setIsRecording(true);
-      const ctrl = startListening(async (heard) => {
-        ctrl.stop();
-        setListenerCtrl(null);
-        setIsRecording(false);
-        await sendAndSpeak(heard);
+  const onMicToggle = async () => {
+    const next = !micOn;
+    setMicOn(next);
+    if (!next) {
+      wakeCtrlRef.current?.stop();
+      listenCtrlRef.current?.stop();
+      wakeCtrlRef.current = null;
+      listenCtrlRef.current = null;
+      return;
+    }
+
+    if (settings.wakeWord) {
+      // Always-on wake word: say "Jupiter" then the command
+      wakeCtrlRef.current = startWakeWord(async (utterance) => {
+        await sendAndSpeak(utterance);
+      }, {
+        onHeard: (_t, _f) => {}, // keep quiet; Jupiter speaks only when relevant
       });
-      setListenerCtrl(ctrl);
+    } else {
+      // Plain STT: whatever you say becomes a command
+      listenCtrlRef.current = startListening(async (text, final) => {
+        if (!final) return;
+        listenCtrlRef.current?.stop();
+        setMicOn(false);
+        await sendAndSpeak(text);
+      });
     }
   };
 
@@ -292,8 +305,8 @@ export const JupiterChat: React.FC = () => {
           </div>
           <div className="p-2 pt-0">
             <div className="flex items-center gap-2">
-              <Button variant={isRecording ? "destructive" : "outline"} size="icon" onClick={handleMicClick} aria-label="Push to talk" className={`rounded-full ${isRecording ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
-                <Mic className={isRecording ? "animate-pulse text-pink-400" : "text-blue-400"} />
+              <Button variant={micOn ? "destructive" : "outline"} size="icon" onClick={onMicToggle} aria-label="Push to talk" className={`rounded-full ${micOn ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
+                <Mic className={micOn ? "animate-pulse text-pink-400" : "text-blue-400"} />
               </Button>
               <Button variant="outline" size="icon" aria-label="Toggle Vision" data-state={spotlight.panels.some(p => p.type === 'vision') ? 'open' : 'closed'} className="rounded-full bg-gray-800 text-white shadow data-[state=open]:bg-blue-900 data-[state=open]:text-blue-300" onClick={handleVisionToggle}>
                 <Eye />
