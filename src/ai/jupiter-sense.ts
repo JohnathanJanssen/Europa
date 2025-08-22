@@ -1,7 +1,7 @@
-import { Detection } from "@/vision/engine";
+import { Det } from "@/vision/types";
 
 interface SenseInput {
-  detections: Detection[];
+  detections: Det[];
   ocrText?: string;
   userContext?: string; // e.g., current conversation topic
 }
