@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import "../styles/shell.css";
 
-export default function TerminalPanel(){
+export default function TerminalPanel({ className, onClose }: { className?: string; onClose?: () => void; }){
   const [out, setOut] = useState<string>("Jupiter terminal. Type `help`.\n");
   const input = useRef<HTMLInputElement>(null);
 
@@ -17,7 +17,7 @@ export default function TerminalPanel(){
     }
   }
   return (
-    <div className="jupiter-panel">
+    <div className={className}>
       <div className="term" aria-label="terminal output">{out}</div>
       <div style={{display:"grid", gridTemplateColumns:"1fr auto", gap:8, marginTop:10}}>
         <input ref={input} className="jupiter-input" placeholder="Type a command..." onKeyDown={(e)=>{ if(e.key==="Enter"){ run((e.target as HTMLInputElement).value); (e.target as HTMLInputElement).value=""; }}}/>

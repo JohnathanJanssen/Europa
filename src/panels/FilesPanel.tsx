@@ -3,18 +3,15 @@ import "../styles/shell.css";
 
 type Dict = Record<string,string>;
 
-/** Loads the repo code (frontend) as RAW strings using Vite's import.meta.glob. */
 function useCodebase(){
-  // Frontend sources
   // @ts-ignore
   const srcFiles: Dict = import.meta.glob("/src/**/*", { as: "raw", eager:true });
-  // Public assets as text when possible
   // @ts-ignore
   const pubFiles: Dict = import.meta.glob("/public/**/*", { as: "raw", eager:true });
   return useMemo(()=> ({...srcFiles, ...pubFiles}) as Dict, []);
 }
 
-export default function FilesPanel(){
+export default function FilesPanel({ className, onClose }: { className?: string; onClose?: () => void; }){
   const files = useCodebase();
   const [current, setCurrent] = useState<string | null>(null);
 
@@ -22,7 +19,7 @@ export default function FilesPanel(){
   const code = current ? files[current] : "";
 
   return (
-    <div className="jupiter-panel" aria-label="Files">
+    <div className={className} aria-label="Files">
       <div style={{display:"grid", gridTemplateColumns:"240px 1fr", gap:12}}>
         <div style={{maxHeight:440, overflow:"auto", borderRight:"1px solid var(--stroke)", paddingRight:8}}>
           <div className="file-list">
