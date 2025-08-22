@@ -19,3 +19,11 @@ export async function startCamera(deviceId?: string): Promise<MediaStream> {
 export function stopStream(stream?: MediaStream|null) {
   try { stream?.getTracks().forEach(t => t.stop()); } catch {}
 }
+
+export async function waitForVideoReady(video: HTMLVideoElement) {
+  if (video.readyState >= 2 && video.videoWidth && video.videoHeight) return;
+  await new Promise<void>(resolve => {
+    const on = () => { video.removeEventListener('loadeddata', on); resolve(); };
+    video.addEventListener('loadeddata', on);
+  });
+}

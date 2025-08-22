@@ -1,12 +1,11 @@
-import { loadDetector } from "./models";
-
+import { loadDetector } from './models';
 export type Det = { x:number; y:number; w:number; h:number; label:string; score:number };
 
 export class VisionEngine {
   private video: HTMLVideoElement;
   private running = false;
-  private fps = 5;               // keep CPU/GPU light
-  private minScore = 0.35;
+  public  fps = 6;        // light but lively
+  public  minScore = 0.30;
 
   constructor(video: HTMLVideoElement) { this.video = video; }
 
@@ -14,7 +13,7 @@ export class VisionEngine {
     if (this.running) return;
     this.running = true;
     const model = await loadDetector();
-    const tick = async () => {
+    const loop = async () => {
       if (!this.running) return;
       try {
         const preds = await model.detect(this.video, 10);
@@ -26,9 +25,9 @@ export class VisionEngine {
           });
         onDetections(dets);
       } catch {}
-      if (this.running) setTimeout(tick, 1000/this.fps);
+      if (this.running) setTimeout(loop, 1000/this.fps);
     };
-    tick();
+    loop();
   }
   stop() { this.running = false; }
 }

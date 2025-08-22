@@ -18,6 +18,13 @@ export async function speak(text: string): Promise<void> {
     const blob = await r.blob();
     const url = URL.createObjectURL(blob);
     playing = new Audio(url);
+    const rate = Number(import.meta.env.VITE_TTS_RATE || '0.92'); // Frieren-like pace
+    try {
+      (playing as any).preservesPitch = true;
+      (playing as any).mozPreservesPitch = true;
+      (playing as any).webkitPreservesPitch = true;
+    } catch {}
+    playing.playbackRate = Math.max(0.75, Math.min(rate, 1.1));
     await playing.play();
     return;
   }
