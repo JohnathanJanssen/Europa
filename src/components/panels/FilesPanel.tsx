@@ -1,140 +1,62 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useJupiterFiles } from "@/hooks/use-jupiter-files";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { Download, Edit, Trash2, UploadCloud } from "lucide-react";
 
-export function FilesPanel() {
-  const {
-    files,
-    content,
-    currentPath,
-    listFiles,
-    readFile,
-    writeFile,
-    deleteFile,
-    createDirectory,
-    renameFile,
-    setContent,
-  } = useJupiterFiles();
-  const [dir, setDir] = useState("");
-  const [newDirName, setNewDirName] = useState("");
+export function FilesPanel(){
+  const { files, listFiles, renameFile, deleteFile, writeFile, currentPath } = useJupiterFiles();
+  
+  React.useEffect(()=>{
+    listFiles(".");
+  },[listFiles]);
 
-  useEffect(() => {
-    listFiles(dir);
-    // eslint-disable-next-line
-  }, [dir]);
+  async function doUpload(e: React.ChangeEvent<HTMLInputElement>){
+    const file = e.target.files?.[0]; if(!file) return;
+    const content = await file.text(); // Assuming text files for simplicity
+    await writeFile(file.name, content);
+    toast.success(`Uploaded "${file.name}"`);
+    listFiles(".");
+    e.target.value = ""; // Reset input
+  }
 
-  const handleRename = async (oldName: string) => {
-    const newName = prompt(`Enter new name for "${oldName}":`, oldName);
-    if (newName && newName.trim() && newName !== oldName) {
-      const oldPath = dir ? `${dir}/${oldName}` : oldName;
-      const newPath = dir ? `${dir}/${newName}` : newName;
-      await renameFile(oldPath, newPath);
-      toast.success(`Renamed to "${newName}"`);
-      listFiles(dir);
-    }
-  };
+  async function doRename(path: string){
+    const oldName = path.split('/').pop() || path;
+    const newName = prompt("Enter new name:", oldName);
+    if(!newName || newName === oldName) return;
+    await renameFile(path, newName);
+    toast.success(`Renamed to "${newName}"`);
+    listFiles(".");
+  }
 
-  const handleDelete = async (name: string) => {
-    if (window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) {
-      const path = dir ? `${dir}/${name}` : name;
+  async function doDelete(path: string) {
+    if (window.confirm(`Are you sure you want to delete "${path}"?`)) {
       await deleteFile(path);
-      toast.success(`"${name}" has been deleted.`);
-      listFiles(dir);
+      toast.success(`Deleted "${path}"`);
+      listFiles(".");
     }
-  };
+  }
 
   return (
-    <div className="p-4 h-full flex flex-col gap-4 text-white">
-      <h2 className="text-xl font-bold mb-2">File Browser</h2>
-      <div className="flex gap-2 mb-2">
-        <Input
-          value={dir}
-          onChange={e => setDir(e.target.value)}
-          placeholder="Directory path..."
-          className="bg-gray-900 text-white"
-        />
-        <Button onClick={() => listFiles(dir)}>List</Button>
+    <div className="space-y-3 h-full flex flex-col">
+      <div className="flex items-center gap-3">
+        <label className="flex-1 flex items-center justify-center gap-2 rounded-xl px-4 py-2 bg-slate-800/70 text-white ring-1 ring-white/10 cursor-pointer">
+          <UploadCloud size={16} />
+          <span>Upload</span>
+          <input type="file" className="hidden" onChange={doUpload}/>
+        </label>
       </div>
-      <div className="flex gap-2 mb-2">
-        <Input
-          value={newDirName}
-          onChange={e => setNewDirName(e.target.value)}
-          placeholder="New directory name"
-          className="bg-gray-900 text-white"
-          onKeyDown={async (e) => {
-            if (e.key === "Enter" && newDirName.trim()) {
-              const path = dir ? `${dir}/${newDirName}` : newDirName;
-              await createDirectory(path);
-              toast.success(`Directory "${newDirName}" created`);
-              setNewDirName("");
-              listFiles(dir);
-            }
-          }}
-        />
-        <Button onClick={async () => {
-          if (!newDirName.trim()) return toast.error("Directory name cannot be empty.");
-          const path = dir ? `${dir}/${newDirName}` : newDirName;
-          await createDirectory(path);
-          toast.success(`Directory "${newDirName}" created`);
-          setNewDirName("");
-          listFiles(dir);
-        }}>Create</Button>
-      </div>
-      <ul className="bg-black/40 rounded p-2 max-h-64 overflow-auto">
-        {files.map(f => (
-          <li key={f.name} className="flex items-center justify-between gap-2 p-1 rounded hover:bg-white/10">
-            <div className="flex items-center gap-2 overflow-hidden">
-              {f.isDir ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDir(dir ? `${dir}/${f.name}` : f.name)}
-                  className="text-blue-400 text-left justify-start w-full"
-                >
-                  <span className="mr-2">📁</span>
-                  <span className="truncate">{f.name}</span>
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => readFile(dir ? `${dir}/${f.name}` : f.name)}
-                  className="text-green-400 text-left justify-start w-full"
-                >
-                  <span className="mr-2">📄</span>
-                  <span className="truncate">{f.name}</span>
-                </Button>
-              )}
+      <div className="flex-1 rounded-xl bg-slate-950/40 ring-1 ring-white/10 divide-y divide-white/5 overflow-y-auto">
+        {files.length===0 && <div className="p-4 text-center text-slate-400">No files yet.</div>}
+        {files.map(f=>(
+          <div key={f.name} className="p-3 flex items-center justify-between gap-2">
+            <div className="text-slate-200 truncate" title={f.name}>{f.name}</div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={()=>doRename(f.name)} className="p-2 rounded-md hover:bg-white/10"><Edit size={14} /></button>
+              <button onClick={()=>doDelete(f.name)} className="p-2 rounded-md hover:bg-white/10 text-red-400"><Trash2 size={14} /></button>
             </div>
-            <div className="flex items-center gap-1 flex-shrink-0">
-              <Button variant="outline" size="sm" onClick={() => handleRename(f.name)}>Rename</Button>
-              <Button variant="destructive" size="sm" onClick={() => handleDelete(f.name)}>Delete</Button>
-            </div>
-          </li>
+          </div>
         ))}
-      </ul>
-      {currentPath && !files.some(f => f.isDir && (dir ? `${dir}/${f.name}` : f.name) === currentPath) && (
-        <div className="mt-4">
-          <h3 className="font-semibold mb-1">Editing: {currentPath}</h3>
-          <Textarea
-            className="w-full h-40 bg-gray-900 font-mono"
-            value={content}
-            onChange={e => setContent(e.target.value)}
-          />
-          <Button
-            className="mt-2"
-            onClick={async () => {
-              await writeFile(currentPath, content);
-              toast.success("File saved");
-            }}
-          >
-            Save
-          </Button>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

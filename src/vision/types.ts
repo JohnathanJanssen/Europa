@@ -1,4 +1,4 @@
-export type Det = { x:number; y:number; w:number; h:number; label:string; score:number };
+export type Det = { x:number; y:number; w:number; h:number; label:string; score:number; trackId?: string };
 export type Track = Det & { id:number; cx:number; cy:number; age:number; trail:[number,number][] };
 export type Insight =
   | { kind:'count'; at:number; counts:Record<string,number> }
