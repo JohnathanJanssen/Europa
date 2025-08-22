@@ -1,0 +1,48 @@
+:root{
+  --cosmos-h: 225;
+  --cosmos-s: 70%;
+  --cosmos-l: 12%;
+  --cosmos-alpha: .55;
+  --cosmos-pulse: 0; /* 0..1 */
+}
+
+.cosmos {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(1200px 600px at 20% 10%,
+      hsla(calc(var(--cosmos-h) - 18), 80%, 55%, .20), transparent 60%),
+    radial-gradient(900px 700px at 85% 25%,
+      hsla(calc(var(--cosmos-h) + 22), 90%, 60%, .16), transparent 60%),
+    radial-gradient(800px 900px at 40% 80%,
+      hsla(calc(var(--cosmos-h) + 10), 75%, 58%, .12), transparent 60%),
+    radial-gradient(1000px 800px at 75% 85%,
+      hsla(calc(var(--cosmos-h) - 8), 80%, 52%, .10), transparent 60%),
+    linear-gradient(
+      180deg,
+      hsl(var(--cosmos-h) var(--cosmos-s) 6%) 0%,
+      hsl(var(--cosmos-h) var(--cosmos-s) 8%) 100%
+    );
+  filter: saturate(1.05) brightness(1.02);
+}
+
+.cosmos::after{
+  content:"";
+  position:absolute; inset:-10%;
+  background:
+    radial-gradient(1200px 1200px at 50% 50%,
+      hsla(calc(var(--cosmos-h) + 35), 85%, 60%, calc(.08 + .22*var(--cosmos-pulse))), transparent 70%);
+  filter: blur(calc(40px + 80px*var(--cosmos-pulse)));
+  transition: filter .6s ease, opacity .6s ease;
+  opacity: .9;
+}
+
+/* subtle drift */
+@keyframes cosmos-drift {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  50%  { transform: translate3d(0,-0.6%,0) scale(1.005); }
+  100% { transform: translate3d(0,0,0) scale(1); }
+}
+.cosmos { animation: cosmos-drift 18s ease-in-out infinite; }

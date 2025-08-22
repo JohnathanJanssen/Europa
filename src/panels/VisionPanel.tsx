@@ -1,70 +1,62 @@
-import React, { useEffect, useRef, useState } from "react";
-import "../styles/shell.css";
+import React, { useEffect, useRef } from "react";
 
-type AnyComp = React.ComponentType<any> | null;
+type Props = {
+  className?: string;
+  onClose?: () => void;
+  stream?: MediaStream | null;
+  boxes?: Array<{ x:number; y:number; w:number; h:number; label?: string; p?: number }>;
+};
 
-export default function VisionPanel({ className, onClose }: { className?: string; onClose?: () => void; }) {
-  const [Comp, setComp] = useState<AnyComp>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const candidates = import.meta.glob("/src/components/vision/LiveCamera.tsx");
-      const load = candidates["/src/components/vision/LiveCamera.tsx"];
-      if (load) {
-        try {
-          const mod: any = await load();
-          if (!cancelled) setComp(() => (mod?.default ?? null));
-          return;
-        } catch {}
-      }
-      if (!cancelled) setComp(() => FallbackCamera);
-    })();
-    return () => { cancelled = true; };
-  }, []);
-
-  const Body = Comp ?? Placeholder;
-  return (
-    <div className={className} style={{ height: "100%", display: "grid" }}>
-      <Body />
-    </div>
-  );
-}
-
-function Placeholder() {
-  return <div style={{ padding: 12, color: "#cfe1ff" }}>Vision is preparing…</div>;
-}
-
-function FallbackCamera() {
+export default function VisionPanel({ className, onClose, stream, boxes = [] }: Props){
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
+    const v = videoRef.current;
+    if (!v) return;
+    v.srcObject = stream ?? null;
+    if (stream) v.play().catch(()=>{});
+  }, [stream]);
+
+  useEffect(() => {
+    const cvs = canvasRef.current, v = videoRef.current;
+    if (!cvs || !v) return;
+    const ctx = cvs.getContext("2d");
+    if (!ctx) return;
+
+    const draw = () => {
+      const { videoWidth: w, videoHeight: h } = v;
+      if (w && h) { cvs.width = w; cvs.height = h; }
+      ctx.clearRect(0,0,cvs.width,cvs.height);
+      for (const b of boxes) {
+        ctx.strokeStyle = "rgba(180,200,255,.85)";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        if (b.label){
+          const tag = `${b.label}${b.p ? ` ${Math.round(b.p*100)}%` : ""}`;
+          ctx.fillStyle = "rgba(20,26,40,.9)";
+          ctx.fillRect(b.x, Math.max(0, b.y-18), ctx.measureText(tag).width + 10, 18);
+          ctx.fillStyle = "rgba(220,230,255,.95)";
+          ctx.font = "12px ui-sans-serif, system-ui";
+          ctx.fillText(tag, b.x + 5, Math.max(12, b.y-6));
         }
-      } catch {}
-    })();
-    return () => {
-      mounted = false;
-      const s = streamRef.current;
-      if (s) s.getTracks().forEach(t => t.stop());
+      }
+      requestAnimationFrame(draw);
     };
-  }, []);
+    let id = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(id);
+  }, [boxes]);
 
   return (
-    <video
-      ref={videoRef}
-      playsInline
-      muted
-      style={{ width: "100%", borderRadius: 12, background: "#000", aspectRatio: "4 / 3" }}
-    />
+    <div className={className ?? ""} role="region" aria-label="Vision">
+      <div className="panel-head">
+        <div className="title">Vision</div>
+        <button className="x" onClick={onClose} aria-label="Close">Close</button>
+      </div>
+      <div className="vision-wrap">
+        <video ref={videoRef} playsInline muted className="vision-video" />
+        <canvas ref={canvasRef} className="vision-overlay" />
+      </div>
+    </div>
   );
 }
