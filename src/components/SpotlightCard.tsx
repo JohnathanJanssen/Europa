@@ -2,6 +2,7 @@ import React from 'react';
 import LiveCamera from './vision/LiveCamera';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
+import { FilesPanel } from './panels/FilesPanel';
 import { uiBus } from '../runtime/uiBus';
 export default function SpotlightCard(){
   const [mode,setMode] = React.useState(uiBus.get());
@@ -11,6 +12,7 @@ export default function SpotlightCard(){
       {mode==='vision'   && <LiveCamera/>}
       {mode==='settings' && <SettingsPanel/>}
       {mode==='terminal' && <TerminalPanel/>}
+      {mode==='files'    && <FilesPanel/>}
       {mode==='front'    && <div className="text-xs text-zinc-600 p-6">Flip to a panel.</div>}
     </div>
   );

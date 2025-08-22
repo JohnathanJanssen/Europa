@@ -1,3 +1,6 @@
+@import "./styles/glow.css";
+@import "./styles/chat-fixes.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

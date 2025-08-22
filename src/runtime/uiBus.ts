@@ -1,4 +1,4 @@
-type Mode = 'front' | 'vision' | 'settings' | 'terminal';
+type Mode = 'front' | 'vision' | 'settings' | 'terminal' | 'files';
 type Listener = (m: Mode) => void;
 
 class UIBus {
@@ -10,6 +10,7 @@ class UIBus {
   openVision()   { this.set('vision'); }
   openSettings() { this.set('settings'); }
   openTerminal() { this.set('terminal'); }
+  openFiles()    { this.set('files'); }
   back()         { this.set('front'); }
 }
 export const uiBus = new UIBus();

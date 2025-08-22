@@ -1,0 +1,5 @@
+/* Remove any leftover mic paddings if markup was deleted */
+.chat-row .mic-space, .chat-row .mic, [data-role="mic"] { display:none !important; }
+
+/* Keep the chat input’s size consistent */
+.chat-row .input { min-height: 48px; }
