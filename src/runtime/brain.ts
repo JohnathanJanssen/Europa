@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { speak } from "./voice";
 
 export type Msg = { role:'system'|'user'|'assistant', content:string };
 
@@ -73,8 +72,4 @@ export function useBrain() {
   }, [messages]);
 
   return { messages, isThinking, ask };
-}
-
-export async function onModelReply(text:string){
-  try{ await speak(text); }catch{}
 }
