@@ -3,8 +3,7 @@ import { createWorker, WorkerOptions } from 'tesseract.js'; // Correctly import 
 let _worker: any;
 export async function ensureWorker() {
   if (_worker) return _worker;
-  // Pass the language ('eng') as the first argument and the options object as the second.
-  // The previous 'undefined' arguments were causing the type mismatch.
+  // Pass the language ('eng') as the first argument, and the options object as the second.
   _worker = await createWorker('eng', { logger: ()=>{} } as Partial<WorkerOptions>);
   // The language is already loaded by createWorker('eng', ...) when 'eng' is passed as the first argument,
   // so we only need to initialize it.
