@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { listCameras, startCamera, stopStream } from '../../vision/camera';
 import { Monitor, Smartphone, RefreshCw } from 'lucide-react';
+import { VisionEngine, type Det } from '../../vision/engine';
+import Overlay from './Overlay';
 
 type Cam = { id: string; label: string };
 
@@ -10,6 +12,8 @@ export default function LiveCamera() {
   const [activeId, setActiveId] = useState<string|undefined>(undefined);
   const [stream, setStream] = useState<MediaStream|null>(null);
   const [busy, setBusy] = useState(false);
+  const [dets, setDets] = useState<Det[]>([]);
+  const engineRef = useRef<VisionEngine|null>(null);
 
   async function refreshList() {
     const list = await listCameras();
@@ -20,6 +24,7 @@ export default function LiveCamera() {
 
   async function start(id?: string) {
     setBusy(true);
+    engineRef.current?.stop();
     stopStream(stream);
     try {
       const s = await startCamera(id);
@@ -27,6 +32,8 @@ export default function LiveCamera() {
       if (videoRef.current) {
         videoRef.current.srcObject = s;
         await videoRef.current.play();
+        engineRef.current = new VisionEngine(videoRef.current!);
+        engineRef.current.start((found)=>setDets(found));
       }
       setActiveId(id);
     } finally {
@@ -36,7 +43,10 @@ export default function LiveCamera() {
 
   useEffect(() => {
     refreshList();
-    return () => stopStream(stream);
+    return () => {
+      stopStream(stream);
+      engineRef.current?.stop();
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -52,6 +62,7 @@ export default function LiveCamera() {
         className="absolute inset-0 w-full h-full object-cover"
         playsInline muted
       />
+      <Overlay dets={dets} video={videoRef.current}/>
       {/* Controls strip */}
       <div className="absolute left-2 right-2 bottom-2 flex items-center gap-2">
         <div className="flex items-center gap-2 bg-zinc-900/70 backdrop-blur rounded-xl px-2 py-1">
