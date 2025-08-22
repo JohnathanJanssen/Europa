@@ -1,6 +1,5 @@
 import React from 'react';
 import { useSpotlight } from '@/state/spotlight';
-import { VisionPanel } from '@/components/ui/VisionPanel';
 import { Button } from '@/components/ui/button';
 import { X, Eye, FileText, Code, StickyNote, Settings, Terminal } from 'lucide-react';
 import { SettingsPanel } from '@/components/panels/SettingsPanel.tsx';

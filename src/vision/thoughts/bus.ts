@@ -10,4 +10,11 @@ export function think(line:string) {
   subs.forEach(fn => fn(buffer));
 }
 export function getThoughts() { return buffer.slice(); }
-export function onThoughts(fn:Sub) { subs.add(fn); fn(buffer); return () => subs.delete(fn); }
+export function onThoughts(fn:Sub) {
+  subs.add(fn);
+  fn(buffer);
+  return () => {
+    subs.delete(fn);
+    // Explicitly return void to satisfy useEffect's cleanup function type
+  };
+}

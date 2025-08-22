@@ -32,9 +32,9 @@ export function integrateVisionContext({ detections, ocrText, userContext = "" }
   }
 
   // Analyze detected objects
-  const relevantDetections = detections.filter(d => RELEVANT_OBJECTS.includes(d.cls) && d.score > 0.6);
+  const relevantDetections = detections.filter(d => RELEVANT_OBJECTS.includes(d.label) && d.score > 0.6);
   if (relevantDetections.length > 0) {
-    const objectNames = [...new Set(relevantDetections.map(d => d.cls))].join(', ');
+    const objectNames = [...new Set(relevantDetections.map(d => d.label))].join(', ');
     visionContext += `The environment includes objects like: ${objectNames}.`;
     // Only surface if it's a new, important object
     if (objectNames.includes('laptop') && !userContext.includes('laptop')) {

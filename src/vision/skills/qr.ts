@@ -8,7 +8,12 @@ export function scanQR(video: HTMLVideoElement) {
   const hit = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
   if (!hit) return null;
   return {
-    corners: hit.location.corners.map(c=>({x:c.x, y:c.y})) as any,
+    corners: [
+      { x: hit.location.topLeftCorner.x, y: hit.location.topLeftCorner.y },
+      { x: hit.location.topRightCorner.x, y: hit.location.topRightCorner.y },
+      { x: hit.location.bottomRightCorner.x, y: hit.location.bottomRightCorner.y },
+      { x: hit.location.bottomLeftCorner.x, y: hit.location.bottomLeftCorner.y },
+    ] as [{x:number;y:number},{x:number;y:number},{x:number;y:number},{x:number;y:number}], // Explicit cast
     text: hit.data
   };
 }

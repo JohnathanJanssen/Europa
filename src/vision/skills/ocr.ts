@@ -1,9 +1,10 @@
-import { createWorker } from 'tesseract.js';
+import { createWorker, WorkerOptions } from 'tesseract.js';
 
 let worker: any = null;
 export async function ensureOCR() {
   if (worker) return worker;
-  worker = await createWorker({ logger: () => {} });
+  const workerOptions: Partial<WorkerOptions> = { logger: () => {} };
+  worker = await createWorker(undefined, workerOptions); // Pass undefined for workerPath, then options
   await worker.loadLanguage('eng'); await worker.initialize('eng');
   return worker;
 }
