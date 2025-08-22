@@ -1,0 +1,19 @@
+:root{ --pulse:0 }
+.cosmos{
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(1100px 700px at 20% 15%, rgba(90,140,255,.14), transparent 60%),
+    radial-gradient(900px 900px at 80% 25%, rgba(145,120,255,.12), transparent 60%),
+    radial-gradient(700px 1000px at 50% 80%, rgba(55,185,230,.10), transparent 65%),
+    linear-gradient(180deg, #0a0f18 0%, #0c101a 100%);
+  filter: saturate(1.04) brightness(1.02);
+}
+.cosmos::after{
+  content:""; position:absolute; inset:-8%;
+  background: radial-gradient(900px 900px at 50% 50%, rgba(130,170,255,calc(.10+.25*var(--pulse))), transparent 60%);
+  filter: blur(calc(50px + 70px*var(--pulse)));
+  transition: filter .5s ease, opacity .5s ease;
+  opacity:.9;
+}
+@keyframes drift{ 0%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-0.6%,0)}100%{transform:translate3d(0,0,0)} }
+.cosmos{ animation:drift 18s ease-in-out infinite }

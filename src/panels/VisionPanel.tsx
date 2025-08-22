@@ -1,70 +1,36 @@
-import React, { useEffect, useRef, useState } from "react";
-import "../styles/shell.css";
+import React, {useEffect, useRef} from "react";
+export default function VisionPanel({ className, onClose, stream, boxes = [] }:{
+  className?: string; onClose?: ()=>void; stream?: MediaStream|null;
+  boxes?: Array<{x:number;y:number;w:number;h:number;label?:string;p?:number}>;
+}){
+  const vref = useRef<HTMLVideoElement>(null);
+  const cref = useRef<HTMLCanvasElement>(null);
 
-type AnyComp = React.ComponentType<any> | null;
-
-export default function VisionPanel({ className, onClose }: { className?: string; onClose?: () => void; }) {
-  const [Comp, setComp] = useState<AnyComp>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const candidates = import.meta.glob("/src/components/vision/LiveCamera.tsx");
-      const load = candidates["/src/components/vision/LiveCamera.tsx"];
-      if (load) {
-        try {
-          const mod: any = await load();
-          if (!cancelled) setComp(() => (mod?.default ?? null));
-          return;
-        } catch {}
+  useEffect(()=>{ const v=vref.current; if(!v) return; v.srcObject = stream ?? null; if(stream) v.play().catch(()=>{}); },[stream]);
+  useEffect(()=>{
+    const cvs=cref.current, v=vref.current; if(!cvs||!v) return;
+    const ctx=cvs.getContext("2d"); if(!ctx) return;
+    let id=0;
+    const loop=()=>{ id=requestAnimationFrame(loop);
+      const {videoWidth:w,videoHeight:h}=v; if(!w||!h) return;
+      if(cvs.width!==w||cvs.height!==h){cvs.width=w;cvs.height=h;}
+      ctx.clearRect(0,0,w,h);
+      for(const b of boxes){
+        ctx.strokeStyle="rgba(180,200,255,.9)"; ctx.lineWidth=2; ctx.strokeRect(b.x,b.y,b.w,b.h);
+        if(b.label){ const t=`${b.label}${b.p?` ${Math.round(b.p*100)}%`:""}`;
+          ctx.fillStyle="rgba(20,26,40,.9)"; ctx.fillRect(b.x, Math.max(0,b.y-18), ctx.measureText(t).width+10, 18);
+          ctx.fillStyle="rgba(225,235,255,.95)"; ctx.font="12px ui-sans-serif, system-ui"; ctx.fillText(t, b.x+5, Math.max(12,b.y-6)); }
       }
-      if (!cancelled) setComp(() => FallbackCamera);
-    })();
-    return () => { cancelled = true; };
-  }, []);
+    }; id=requestAnimationFrame(loop); return()=>cancelAnimationFrame(id);
+  },[boxes]);
 
-  const Body = Comp ?? Placeholder;
   return (
-    <div className={className} style={{ height: "100%", display: "grid" }}>
-      <Body />
+    <div className={className ?? ""} role="region" aria-label="Vision">
+      <div className="panel-head"><div className="title">Vision</div><button className="x" onClick={onClose}>Close</button></div>
+      <div className="vision-wrap">
+        <video ref={vref} className="vision-video" muted playsInline/>
+        <canvas ref={cref} className="vision-overlay"/>
+      </div>
     </div>
-  );
-}
-
-function Placeholder() {
-  return <div style={{ padding: 12, color: "#cfe1ff" }}>Vision is preparing…</div>;
-}
-
-function FallbackCamera() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (!mounted) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          await videoRef.current.play();
-        }
-      } catch {}
-    })();
-    return () => {
-      mounted = false;
-      const s = streamRef.current;
-      if (s) s.getTracks().forEach(t => t.stop());
-    };
-  }, []);
-
-  return (
-    <video
-      ref={videoRef}
-      playsInline
-      muted
-      style={{ width: "100%", borderRadius: 12, background: "#000", aspectRatio: "4 / 3" }}
-    />
   );
 }
