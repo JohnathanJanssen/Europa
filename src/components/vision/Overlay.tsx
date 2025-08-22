@@ -13,7 +13,8 @@ export default function Overlay({
 
   useEffect(() => {
     const cvs = canvasRef.current; if (!cvs || !video) return;
-    const vw = video.videoWidth || 640, vh = video.videoHeight || 480;
+    const vw = video.videoWidth || 0;
+    const vh = video.videoHeight || 0;
     if (!vw || !vh) return; // Guard against 0 dimensions
     const cw = cvs.clientWidth || cvs.parentElement?.clientWidth || 640;
     const ch = cvs.clientHeight || cvs.parentElement?.clientHeight || 480;

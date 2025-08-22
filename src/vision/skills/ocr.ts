@@ -1,25 +1,22 @@
-import { createWorker, WorkerOptions } from 'tesseract.js';
+import { createWorker, WorkerOptions } from 'tesseract.js'; // Correctly import WorkerOptions as a named export
 
-let worker: any = null;
-export async function ensureOCR() {
-  if (worker) return worker;
-  // For tesseract.js, pass the options object directly as the first argument
-  // when not specifying a custom worker path or language as a positional argument.
-  worker = await createWorker({ logger: () => {} } as Partial<WorkerOptions>);
-  await worker.loadLanguage('eng'); await worker.initialize('eng');
-  return worker;
+let _worker: any;
+export async function ensureWorker() {
+  if (_worker) return _worker;
+  // Pass undefined as the first argument (for languages) and the options object as the second.
+  _worker = await createWorker(undefined, { logger: ()=>{} } as Partial<WorkerOptions>);
+  await _worker.loadLanguage('eng'); await _worker.initialize('eng');
+  return _worker;
 }
-
-/** Samples center crop for text; heavy => call sparsely */
-export async function scanCenterText(video: HTMLVideoElement) {
-  const w = video.videoWidth || 640, h = video.videoHeight || 480;
-  if (!w || !h) return null;
-  const rx = Math.floor(w*0.18), ry = Math.floor(h*0.18), rw = Math.floor(w*0.64), rh = Math.floor(h*0.64);
-  const cvs = document.createElement('canvas'); cvs.width=rw; cvs.height=rh;
-  const ctx = cvs.getContext('2d')!; ctx.drawImage(video, rx, ry, rw, rh, 0,0,rw,rh);
-  const wkr = await ensureOCR();
-  const { data } = await wkr.recognize(cvs);
-  const text = (data.text || '').trim();
-  if (!text) return null;
-  return { box:{ x:rx, y:ry, w:rw, h:rh }, text };
+export async function scanCenterText(video: HTMLVideoElement | null){
+  if (!video) return null;
+  const w = video.videoWidth|0, h = video.videoHeight|0; if (!w || !h) return null;
+  const cx = Math.max(0, Math.floor(w*0.25)), cy = Math.max(0, Math.floor(h*0.25));
+  const cw = Math.max(1, Math.floor(w*0.5)),  ch = Math.max(1, Math.floor(h*0.5));
+  const canvas = document.createElement('canvas'); canvas.width=cw; canvas.height=ch;
+  const ctx = canvas.getContext('2d'); if(!ctx) return null;
+  ctx.drawImage(video, cx, cy, cw, ch, 0, 0, cw, ch);
+  const worker = await ensureWorker();
+  try { const { data:{ text } } = await worker.recognize(canvas); return text.trim() ? { text:text.trim(), box:{x:cx,y:cy,w:cw,h:ch} } : null; }
+  catch { return null; }
 }
