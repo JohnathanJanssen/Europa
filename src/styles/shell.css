@@ -17,13 +17,14 @@
   border:1px solid var(--stroke); backdrop-filter: blur(16px);
   box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 140px 20px rgba(100,120,220,0.14);
   display:grid; grid-template-rows: auto 1fr auto; overflow:hidden; position:relative;
+  position:relative;z-index:1;
 }
 .jupiter-header{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px 10px 22px; }
 .jupiter-title{ letter-spacing:0.28em; font-weight:800; font-size:28px; color:#ecf2ff; cursor:pointer; user-select:none;}
 .jupiter-thoughts{ color:#cfd8ea; background: var(--glass-2); border:1px solid var(--stroke);
   padding:8px 12px; border-radius:999px; font-size:13px; max-width: 62%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.jupiter-body{ position:relative; overflow:hidden; }
+.jupiter-body{ position:relative; overflow:hidden; z-index:1; }
 .jupiter-body-frame{ position:absolute; inset:0; overflow:hidden; padding:14px 18px 6px 18px; display: flex; flex-direction: column; }
 .jupiter-scroll { flex-grow: 1; overflow-y: auto; }
 .jupiter-footer{
@@ -53,3 +54,8 @@
 .code-view{ white-space:pre; overflow:auto; max-height:420px; font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace; font-size:12px; color:#e9f1ff; }
 .term{ font-family: ui-monospace, Menlo, Monaco; color:#cfe1ff; background:rgba(5,6,9,0.6); border:1px solid var(--stroke); height:100%; border-radius:12px; padding:10px; overflow:auto; flex-grow: 1; }
 .hidden{ display:none; }
+
+.vision-wrap{position:relative}
+.vision-video,.vision-overlay{width:100%;display:block;border-radius:16px}
+.vision-overlay{position:absolute;inset:0;pointer-events:none}
+.foot-icons .ico.active{box-shadow:0 0 0 2px rgba(180,200,255,.16) inset, 0 0 18px rgba(120,170,255,.35)}
