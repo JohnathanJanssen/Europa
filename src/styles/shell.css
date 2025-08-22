@@ -1,0 +1,43 @@
+:root{
+  --card-w: 540px;    /* fixed widget width  (≈ fits 2.88" class UIs nicely) */
+  --card-h: 720px;    /* fixed widget height */
+  --radius-xl: 20px;
+  --glass: rgba(20, 24, 31, 0.72);
+  --glass-2: rgba(24, 28, 36, 0.72);
+  --stroke: rgba(255,255,255,0.06);
+  --accent: linear-gradient(135deg,#5b8bff 0%, #9b5bff 100%);
+  --accent-raw: #7c6cff;
+  --icon-dim: rgba(255,255,255,0.45);
+  --icon-lit: #cdd8ff;
+}
+.jupiter-card{ width:var(--card-w); height:var(--card-h); border-radius:var(--radius-xl);
+  background: radial-gradient(120% 90% at 20% 10%, rgba(76,98,138,0.18) 0%, transparent 55%) , var(--glass);
+  border:1px solid var(--stroke); backdrop-filter: blur(16px);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.55), 0 0 140px 20px rgba(100,120,220,0.14);
+  display:grid; grid-template-rows: auto 1fr auto; overflow:hidden; position:relative;
+}
+.jupiter-header{ display:flex; align-items:center; justify-content:space-between; padding:18px 22px 10px 22px; }
+.jupiter-title{ letter-spacing:0.28em; font-weight:800; font-size:28px; color:#ecf2ff; cursor:pointer; user-select:none;}
+.jupiter-thoughts{ color:#cfd8ea; background: var(--glass-2); border:1px solid var(--stroke);
+  padding:8px 12px; border-radius:999px; font-size:13px; max-width: 62%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.jupiter-body{ position:relative; overflow:hidden; }
+.jupiter-body-inner{ position:absolute; inset:0; overflow:auto; padding:14px 18px 6px 18px; }
+.jupiter-footer{ padding:12px 16px 18px 16px; display:grid; grid-template-columns: 1fr auto; gap:10px; }
+.jupiter-input{ background:rgba(10,12,18,0.7); border:1px solid var(--stroke); color:#e8eeff;
+  border-radius:14px; height:48px; padding:0 14px; outline:none;
+}
+.jupiter-send{ width:52px; height:48px; border-radius:14px; border:none; color:#fff; background:var(--accent); cursor:pointer; }
+.jupiter-toolbar{ position:absolute; left:16px; bottom:80px; display:flex; gap:12px; }
+.jupiter-icon{ width:40px; height:40px; border-radius:12px; display:grid; place-items:center; border:1px solid var(--stroke);
+  background:rgba(18,20,28,0.7); color:var(--icon-dim); cursor:pointer; transition: all .18s ease;
+}
+.jupiter-icon:hover{ transform: translateY(-1px); color:#e6eeff; }
+.jupiter-icon.active{ outline:2px solid rgba(124,108,255,0.35); box-shadow: 0 0 0 4px rgba(124,108,255,0.12) inset; color:var(--icon-lit); }
+.jupiter-panel{ background:rgba(10,12,18,0.6); border:1px solid var(--stroke); border-radius:16px; padding:12px; }
+.file-list{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Courier New", monospace; font-size:12px; color:#cfe1ff; display:grid; grid-template-columns: 1fr auto; gap:8px; }
+.file-item{ padding:6px 8px; border-radius:8px; cursor:pointer; }
+.file-item:hover{ background:rgba(255,255,255,0.06); }
+.code-view{ white-space:pre; overflow:auto; max-height:420px; font-family: ui-monospace, Menlo, Monaco, "Courier New", monospace; font-size:12px; color:#e9f1ff; }
+.term{ font-family: ui-monospace, Menlo, Monaco; color:#cfe1ff; background:rgba(5,6,9,0.6); border:1px solid var(--stroke); height:440px; border-radius:12px; padding:10px; overflow:auto; }
+.hidden{ display:none; }
