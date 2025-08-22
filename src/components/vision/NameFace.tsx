@@ -1,0 +1,32 @@
+import React, { useState } from 'react';
+import type { Face } from '../../vision/types';
+import { upsert } from '../../vision/face/db';
+
+export default function NameFace({
+  candidate, onDone
+}: { candidate: Face | null; onDone: ()=>void }) {
+  const [name, setName] = useState('');
+  if (!candidate) return null;
+  return (
+    <div className="absolute top-2 right-2 bg-black/60 backdrop-blur rounded-lg p-2 text-xs flex items-center gap-2 z-10">
+      <span>new face — name?</span>
+      <input
+        className="bg-zinc-900 text-zinc-100 rounded px-2 py-1 outline-none"
+        placeholder="name"
+        value={name}
+        onChange={e=>setName(e.target.value)}
+        onKeyDown={e=>{
+          if (e.key==='Enter' && name.trim() && candidate.descriptor) {
+            upsert(name.trim(), candidate.descriptor);
+            setName(''); onDone();
+          }
+        }}
+      />
+      <button
+        className="px-2 py-1 rounded bg-zinc-800 hover:bg-zinc-700"
+        onClick={()=>onDone()}
+        title="dismiss"
+      >×</button>
+    </div>
+  );
+}

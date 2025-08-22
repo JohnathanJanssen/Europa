@@ -1,9 +1,11 @@
 import { listCameras, startCamera, stopStream, waitForVideoReady } from '../../vision/camera';
 import { VisionEngine } from '../../vision/engine';
-import type { Det, Track, Insight } from '../../vision/types';
+import type { Det, Track, Insight, Face } from '../../vision/types';
 import Overlay from './Overlay';
 import React, { useEffect, useRef, useState } from 'react';
 import { Monitor, Smartphone, RefreshCw } from 'lucide-react';
+import { Recognizer } from '../../vision/face/recognizer';
+import NameFace from './NameFace';
 
 const Pill = ({text}:{text:string}) => <div className="ml-auto text-xs bg-zinc-900/70 rounded-md px-2 py-1">{text}</div>;
 
@@ -19,19 +21,23 @@ export default function LiveCamera() {
   const [motion, setMotion] = useState<{grid:Float32Array,w:number,h:number}|null>(null);
   const [analyze, setAnalyze] = useState(true);
   const [log, setLog] = useState<string[]>([]);
+  const [faces, setFaces] = useState<Face[]>([]);
+  const [nameAsk, setNameAsk] = useState<Face|null>(null);
   const engineRef = useRef<VisionEngine|null>(null);
+  const recognizerRef = useRef<Recognizer|null>(null);
 
   async function refreshList(){ const list=await listCameras(); const mapped=list.map(d=>({id:d.deviceId,label:d.label||'Camera'})); setCams(mapped); if(!activeId && mapped[0]) setActiveId(mapped[0].id); }
 
   async function start(id?:string){
     setBusy(true); setStatus('loading'); 
     engineRef.current?.stop();
+    recognizerRef.current?.stop();
     stopStream(stream);
     try{
       const s=await startCamera(id); setStream(s);
       if(videoRef.current){ videoRef.current.srcObject=s; await videoRef.current.play(); await waitForVideoReady(videoRef.current); }
       
-      setDets([]); setTracks([]); setMotion(null);
+      setDets([]); setTracks([]); setMotion(null); setFaces([]);
       if(videoRef.current){
         engineRef.current=new VisionEngine(videoRef.current);
         engineRef.current.fps=6; engineRef.current.minScore=0.30;
@@ -53,21 +59,31 @@ export default function LiveCamera() {
           const msg = lines.filter(Boolean)[0];
           if (msg) setLog(prev => (prev[0]===msg ? prev : [msg, ...prev].slice(0,5)));
         });
+
+        // start face recognizer
+        recognizerRef.current = new Recognizer(videoRef.current);
+        recognizerRef.current.start((fs)=>{
+          if (!analyze) return;
+          setFaces(fs);
+          // if an unknown face appears, ask once (non-blocking)
+          const unknown = fs.find(f => f.isNew && f.descriptor);
+          if (unknown && !nameAsk) setNameAsk(unknown);
+        });
       }
       setStatus('running');
       setActiveId(id);
     } finally { setBusy(false); }
   }
 
-  useEffect(()=>{ refreshList(); return () => { stopStream(stream); engineRef.current?.stop(); } },[]);
+  useEffect(()=>{ refreshList(); return () => { stopStream(stream); engineRef.current?.stop(); recognizerRef.current?.stop(); } },[]);
   useEffect(()=>{ if(activeId) start(activeId); },[activeId]);
   // allow toggling analyze without restarting camera
-  useEffect(()=>{ if(!analyze){ setDets([]); setTracks([]); setMotion(null); } },[analyze]);
+  useEffect(()=>{ if(!analyze){ setDets([]); setTracks([]); setMotion(null); setFaces([]); } },[analyze]);
 
   return (
     <div className="w-full h-[360px] sm:h-[400px] rounded-xl overflow-hidden bg-black relative text-white">
       <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
-      <Overlay dets={dets} tracks={tracks} video={videoRef.current} motion={motion}/>
+      <Overlay dets={dets} tracks={tracks} video={videoRef.current} motion={motion} faces={faces}/>
       {/* controls */}
       <div className="absolute left-2 right-2 bottom-2 flex items-center gap-2">
         <div className="flex items-center gap-2 bg-zinc-900/70 backdrop-blur rounded-xl px-2 py-1">
@@ -84,10 +100,12 @@ export default function LiveCamera() {
         </div>
         <Pill text={status==='loading'?'Loading…': status==='running'?(dets.length?`Live · ${dets.length}`:'Live · …'):'Ready'} />
       </div>
+      <NameFace candidate={nameAsk} onDone={()=>setNameAsk(null)} />
       {/* quiet ticker (Jupiter's thoughts) */}
       <div className="absolute top-2 right-2 text-[11px] bg-black/55 rounded-md px-2 py-1 max-w-[46%] backdrop-blur text-white text-right">
         {log[0] || 'observing'}
       </div>
+      <div className="sr-only">Privacy: face memory stores locally only. Use Settings → Forget Faces to clear.</div>
     </div>
   );
 }

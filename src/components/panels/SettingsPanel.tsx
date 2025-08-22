@@ -3,6 +3,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { webSpeechAvailable } from '../../runtime/cap';
+import { forgetFaces } from '../../vision/face/settings';
+import { Button } from "@/components/ui/button";
 
 const voices = [
   { id: "elevenlabs-1", name: "ElevenLabs - Ava" },
@@ -99,6 +101,17 @@ export function SettingsPanel() {
       <div className="flex items-center justify-between">
         <Label className="text-gray-300">Privacy Mode</Label>
         <Switch checked={settings.privacy} onCheckedChange={val => setSettings(s => ({ ...s, privacy: val }))} />
+      </div>
+      <div>
+        <Label className="text-gray-300">Face Recognition</Label>
+        <Button variant="destructive" className="w-full mt-1" onClick={() => {
+          if (confirm('Are you sure you want to forget all learned faces? This cannot be undone.')) {
+            forgetFaces();
+          }
+        }}>
+          Forget All Faces
+        </Button>
+        <p className="text-xs text-gray-500 mt-1">Clears all locally stored face data from your browser.</p>
       </div>
     </div>
   );

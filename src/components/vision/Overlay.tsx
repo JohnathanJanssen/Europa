@@ -1,10 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import type { Det } from '../../vision/types';
+import type { Det, Face } from '../../vision/types';
 type Track = import('../../vision/types').Track;
 
 export default function Overlay({
-  dets, tracks, video, motion
-}: { dets: Det[]; tracks: Track[]; video: HTMLVideoElement | null; motion: {grid:Float32Array,w:number,h:number} | null }) {
+  dets, tracks, video, motion, faces
+}: {
+  dets: Det[]; tracks: Track[]; video: HTMLVideoElement | null;
+  motion: {grid:Float32Array,w:number,h:number} | null;
+  faces?: Face[];
+}) {
   const canvasRef = useRef<HTMLCanvasElement|null>(null);
 
   useEffect(() => {
@@ -54,13 +58,35 @@ export default function Overlay({
       ctx.stroke();
     });
 
+    // Faces: name pills (purple if known, amber if new)
+    if (faces && faces.length) {
+      for (const f of faces) {
+        const x = Math.floor(f.x*sx), y = Math.floor(f.y*sy), w = Math.floor(f.w*sx), h = Math.floor(f.h*sy);
+        ctx.strokeStyle = f.name ? 'rgba(178, 102, 255, 0.95)' : 'rgba(255, 190, 92, 0.95)';
+        ctx.lineWidth = 2; ctx.shadowColor='rgba(0,0,0,0.6)'; ctx.shadowBlur=8;
+        ctx.strokeRect(x,y,w,h); ctx.shadowBlur=0;
+
+        const label = f.name ? `${f.name}` : `new?`;
+        const padX=6,padY=2, th=18; ctx.font='12px system-ui';
+        const tw = Math.ceil(ctx.measureText(label).width)+padX*2;
+        ctx.fillStyle = f.name ? 'rgba(88, 43, 138, 0.85)' : 'rgba(138, 86, 24, 0.85)';
+        ctx.fillRect(x, Math.max(0,y-th), tw, th);
+        ctx.fillStyle = 'rgba(240,240,255,0.98)';
+        ctx.fillText(label, x+padX, Math.max(0,y-th)+padY);
+      }
+    }
+
     // center reticle
     ctx.strokeStyle='rgba(255,255,255,0.25)';
     ctx.beginPath(); ctx.moveTo(cw/2-8, ch/2); ctx.lineTo(cw/2+8, ch/2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cw/2, ch/2-8); ctx.lineTo(cw/2, ch/2+8); ctx.stroke();
-  }, [dets, tracks, video, motion]);
+  }, [dets, tracks, video, motion, faces]);
 
-  const chips = Array.from(new Set(dets.map(d=>d.label))).slice(0,5);
+  const chips = Array.from(new Set([
+    ...dets.map(d=>d.label),
+    ...(faces||[]).map(f=>f.name || 'face')
+  ])).slice(0,5);
+
   return (
     <>
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none"/>
