@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React,{useEffect,useRef,useState} from 'react';
 import { listCameras, startCamera, stopStream, waitForVideoReady } from '../../vision/camera';
 import { VisionEngine } from '../../vision/engine';
 import type { Det, Track, Face, Pose, QRHit, OCRHit, SceneSense } from '../../vision/types';
@@ -11,170 +11,102 @@ import { scanCenterText } from '../../vision/skills/ocr';
 import { think } from '../../vision/thoughts/bus';
 import { visionBus } from '../../runtime/visionBus';
 
-const Pill = ({text}:{text:string}) =>
-  <div className="ml-auto text-xs bg-zinc-900/70 rounded-md px-2 py-1">{text}</div>;
+export default function LiveCamera(){
+  const videoRef=useRef<HTMLVideoElement|null>(null);
+  const timersRef=useRef<number[]>([]);
+  const askRef   =useRef({ waiting:false, coolUntil:0, lastSig:'' });
 
-export default function LiveCamera() {
-  const videoRef = useRef<HTMLVideoElement|null>(null);
-  const timersRef = useRef<number[]>([]);
-  const [cams, setCams] = useState<{id:string;label:string}[]>([]);
-  const [activeId, setActiveId] = useState<string|undefined>();
-  const [stream, setStream] = useState<MediaStream|null>(null);
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState<'idle'|'loading'|'running'>('idle');
+  const [cams,setCams]=useState<{id:string;label:string}[]>([]);
+  const [activeId,setActiveId]=useState<string>();
+  const [stream,setStream]=useState<MediaStream|null>(null);
+  const [status,setStatus]=useState<'idle'|'loading'|'running'>('idle');
+  const [busy,setBusy]=useState(false);
 
-  const [dets, setDets] = useState<Det[]>([]);
-  const [tracks, setTracks] = useState<Track[]>([]);
+  const [dets,setDets]=useState<Det[]>([]);
+  const [tracks,setTracks]=useState<Track[]>([]);
+  const [faces,setFaces]=useState<Face[]>([]);
+  const [pose,setPose]=useState<Pose|null>(null);
+  const [qr,setQR]=useState<QRHit|null>(null);
+  const [ocr,setOCR]=useState<OCRHit|null>(null);
+  const [scene,setScene]=useState<SceneSense|null>(null);
   const [motion, setMotion] = useState<{grid:Float32Array,w:number,h:number}|null>(null);
 
-  const [faces, setFaces] = useState<Face[]>([]);
-  const [pose, setPose] = useState<Pose|null>(null);
-  const [qr, setQR] = useState<QRHit|null>(null);
-  const [ocr, setOCR] = useState<OCRHit|null>(null);
-  const [scene, setScene] = useState<SceneSense|null>(null);
+  const [analyze,setAnalyze]=useState(true);
+  const [facesOn,setFacesOn]=useState(true);
+  const [poseOn,setPoseOn]=useState(true);
+  const [qrOn,setQROn]=useState(true);
+  const [sceneOn,setSceneOn]=useState(true);
+  const [ocrOn,setOCROn]=useState(false);
 
-  const engineRef = useRef<VisionEngine|null>(null);
-  const reconRef  = useRef<Recognizer|null>(null);
+  useEffect(()=>{ (async()=>{ const L=await listCameras(); setCams(L.map(d=>({id:d.deviceId,label:d.label||'Camera'}))); if(!activeId && L[0]) setActiveId(L[0].deviceId); })(); },[]);
+  function clearTimers(){ timersRef.current.forEach(id=>clearInterval(id)); timersRef.current=[]; }
+  function cleanup(){ clearTimers(); stopStream(stream); setStatus('idle'); visionBus.setOnline(false); }
 
-  const [analyze, setAnalyze] = useState(true);
-  const [facesOn, setFacesOn] = useState(true);
-  const [poseOn, setPoseOn] = useState(true);
-  const [qrOn, setQROn] = useState(true);
-  const [sceneOn, setSceneOn] = useState(true);
-  const [ocrOn, setOCROn] = useState(false);
-
-  async function refreshList() {
-    const list = await listCameras();
-    const mapped = list.map(d => ({ id: d.deviceId, label: d.label || 'Camera' }));
-    setCams(mapped);
-    if (!activeId && mapped[0]) setActiveId(mapped[0].id);
-  }
-
-  function clearTimers() { timersRef.current.forEach(id => clearInterval(id)); timersRef.current = []; }
-  function cleanup() {
-    clearTimers();
-    engineRef.current?.stop(); engineRef.current = null;
-    reconRef.current?.stop();  reconRef.current  = null;
-    stopStream(stream);
-    setStatus('idle');
-    visionBus.setOnline(false);
-  }
-
-  // receive enrollment from chat
-  useEffect(() => visionBus.onEnroll.on((name) => {
-    const r: any = reconRef.current;
-    if (r?.enrollLastUnknown) r.enrollLastUnknown(name);
+  // enroll from chat
+  useEffect(()=>visionBus.onEnroll.on(({name})=>{
     think(`enrolled: ${name}`);
-  }), []);
+    askRef.current.waiting=false;
+  }),[]);
 
-  useEffect(()=>{ refreshList(); return cleanup; }, []);
+  useEffect(()=>{ if(!activeId) return;
+    (async()=>{
+      cleanup(); setBusy(true); setStatus('loading');
+      try{
+        const s=await startCamera(activeId); setStream(s);
+        const v=videoRef.current!; v.srcObject=s; await v.play(); await waitForVideoReady(v);
 
-  useEffect(()=>{ if (!activeId) return;
-    (async () => {
-      cleanup();
-      setBusy(true); setStatus('loading');
-      try {
-        const s = await startCamera(activeId); setStream(s);
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-          await videoRef.current.play();
-          await waitForVideoReady(videoRef.current);
-        }
+        const engine=new VisionEngine(v); engine.fps=6; engine.minScore=0.30;
+        await engine.start(({tracks,dets,insights, motion})=>{
+          if(!analyze) return;
+          setTracks(tracks); setDets(dets); setMotion(motion);
+          insights.forEach(i=>{ if(i.kind==='count'){ const best=Object.entries(i.counts).sort((a,b)=>b[1]-a[1])[0]; if(best) think(`seeing ${best[1]} ${best[0]}`); }});
+        });
 
-        if (videoRef.current) {
-          const v = videoRef.current;
+        // recognizer
+        const recog=new Recognizer(v);
+        recog.start((fs)=>{
+          if(!analyze || !facesOn) return;
+          setFaces(fs);
+          const known = fs.filter(f=>f.name).map(f=>f.name);
+          if(known.length) think(`with ${Array.from(new Set(known)).join(', ')}`);
 
-          // engine
-          engineRef.current = new VisionEngine(v);
-          engineRef.current.fps = 6;
-          engineRef.current.minScore = 0.30;
-          await engineRef.current.start(({tracks, dets, insights, motion}) => {
-            if (!analyze) return;
-            setDets(dets); setTracks(tracks); setMotion(motion);
-            insights.forEach(i => {
-              if (i.kind === 'count') {
-                const top = Object.entries(i.counts).sort((a,b)=>b[1]-a[1]).slice(0,2)
-                  .map(([k,v]) => `${v} ${k}`).join(', ');
-                if (top) think(`seeing ${top}`);
-              } else if (i.kind === 'motion') {
-                think(`motion on the ${i.zone}`);
-              } else if (i.kind === 'novel') {
-                think(`new ${i.label}`);
-              }
-            });
-          });
+          // Stable unknown detection → single ask with cooldown
+          const u = fs.find(f=>!f.name); if(!u) return;
+          const sig = (u as any).signature || `${Math.round(u.x||0)}:${Math.round(u.y||0)}:${Math.round(u.w||0)}:${Math.round(u.h||0)}`;
+          const now=Date.now();
+          if (askRef.current.waiting) return;
+          if (now < askRef.current.coolUntil && sig===askRef.current.lastSig) return;
 
-          // faces
-          setFaces([]);
-          if (facesOn) {
-            reconRef.current = new Recognizer(v);
-            reconRef.current.start((fs) => {
-              setFaces(fs);
-              const known = fs.filter(f => f.name).map(f => f.name).join(', ');
-              if (known) think(`with ${known}`);
-              if (fs.some(f => f.isNew)) {
-                think('new face—name?');
-                visionBus.requestIdentity();
-              }
-            });
-          }
+          askRef.current.waiting=true;
+          askRef.current.lastSig=sig;
+          askRef.current.coolUntil=now+90_000; // 90s
+          visionBus.requestIdentity(sig);
+        });
 
-          const every = (ms:number, fn:()=>void) => { fn(); const id = window.setInterval(fn, ms); timersRef.current.push(id); };
+        const every=(ms:number,fn:()=>void)=>{ fn(); const id=window.setInterval(fn,ms); timersRef.current.push(id); };
+        every(250,  async()=>{ if(poseOn  && analyze) setPose(await detectPose(v)); });
+        every(1000,      ()=>{ if(qrOn    && analyze) setQR(scanQR(v) || null); });
+        every(2500, async()=>{ if(sceneOn && analyze) setScene(await classifyScene(v)); });
+        every(4000, async()=>{ if(ocrOn   && analyze) setOCR(await scanCenterText(v) || null); });
 
-          every(250,  async () => { if (poseOn  && analyze) setPose(await detectPose(v)); });
-          every(1000,       () => { if (qrOn    && analyze) setQR(scanQR(v) || null);     });
-          every(2500, async () => { if (sceneOn && analyze) setScene(await classifyScene(v)); });
-          every(4000, async () => { if (ocrOn   && analyze) setOCR(await scanCenterText(v) || null); });
-        }
-
-        setStatus('running');
-        visionBus.setOnline(true);
-      } catch (e) {
-        cleanup();
-        throw e;
-      } finally {
-        setBusy(false);
-      }
+        setStatus('running'); visionBus.setOnline(true);
+      } finally { setBusy(false); }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId, analyze, facesOn, poseOn, qrOn, sceneOn, ocrOn]);
-
-  useEffect(()=>{ if(!analyze){ setDets([]); setTracks([]); setMotion(null); setPose(null); setQR(null); setOCR(null); setScene(null); } },[analyze]);
+    return cleanup;
+  },[activeId,analyze,facesOn,poseOn,qrOn,sceneOn,ocrOn]);
 
   return (
-    <div className="w-full h-[360px] sm:h-[400px] rounded-xl overflow-hidden bg-black relative">
+    <div className="w-full h-[360px] rounded-xl overflow-hidden bg-black relative">
       <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover" playsInline muted />
-
-      <Overlay
-        dets={dets} tracks={tracks} video={videoRef.current} motion={motion}
-        faces={faces} pose={pose} qr={qr} ocr={ocr} scene={scene}
-      />
-
-      <div className="absolute left-2 right-2 bottom-2 flex items-center gap-2">
-        <div className="flex items-center gap-2 bg-zinc-900/70 backdrop-blur rounded-xl px-2 py-1">
-          <button className="p-2 rounded-md hover:bg-zinc-800 disabled:opacity-50"
-                  disabled={busy || cams.length===0}
-                  onClick={()=>cams[0] && setActiveId(cams[0].id)}
-                  title="Primary camera">●</button>
-          <button className="p-2 rounded-md opacity-50 cursor-not-allowed" title="iPhone camera (coming soon)">📱</button>
-          <button className="p-2 rounded-md hover:bg-zinc-800 disabled:opacity-50"
-                  disabled={busy || cams.length<2}
-                  onClick={()=>{
-                    if (cams.length<2) return;
-                    const idx = Math.max(0, cams.findIndex(c => c.id===activeId));
-                    const next = cams[(idx+1) % cams.length];
-                    if (next) setActiveId(next.id);
-                  }}
-                  title="Next camera">↻</button>
-
-          <label className="text-xs flex items-center gap-1 ml-1"><input type="checkbox" checked={analyze} onChange={e=>setAnalyze(e.target.checked)}/> Analyze</label>
-          <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={facesOn} onChange={e=>setFacesOn(e.target.checked)}/> Faces</label>
-          <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={poseOn} onChange={e=>setPoseOn(e.target.checked)}/> Pose</label>
-          <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={qrOn} onChange={e=>setQROn(e.target.checked)}/> QR</label>
-          <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={sceneOn} onChange={e=>setSceneOn(e.target.checked)}/> Scene</label>
-          <label className="text-xs flex items-center gap-1"><input type="checkbox" checked={ocrOn} onChange={e=>setOCROn(e.target.checked)}/> Text</label>
-        </div>
-        <Pill text={status==='loading' ? 'Loading…' : status==='running' ? (dets.length ? `Live · ${dets.length}` : 'Live · …') : 'Ready'} />
+      <Overlay dets={dets} tracks={tracks} faces={faces} pose={pose} qr={qr} ocr={ocr} scene={scene} video={videoRef.current} motion={motion}/>
+      <div className="absolute left-2 right-2 bottom-2 flex items-center gap-2 bg-zinc-900/70 border border-zinc-800 rounded-xl px-2 py-1">
+        <button className="text-xs px-2 py-1 rounded hover:bg-zinc-800" onClick={()=>setAnalyze(v=>!v)}>{analyze?'Pause':'Analyze'}</button>
+        <label className="text-[11px] flex items-center gap-1"><input type="checkbox" checked={facesOn} onChange={e=>setFacesOn(e.target.checked)}/> Faces</label>
+        <label className="text-[11px] flex items-center gap-1"><input type="checkbox" checked={poseOn}  onChange={e=>setPoseOn(e.target.checked)}/> Pose</label>
+        <label className="text-[11px] flex items-center gap-1"><input type="checkbox" checked={qrOn}    onChange={e=>setQROn(e.target.checked)}/> QR</label>
+        <label className="text-[11px] flex items-center gap-1"><input type="checkbox" checked={sceneOn} onChange={e=>setSceneOn(e.target.checked)}/> Scene</label>
+        <label className="text-[11px] flex items-center gap-1"><input type="checkbox" checked={ocrOn}   onChange={e=>setOCROn(e.target.checked)}/> Text</label>
+        <div className="ml-auto text-[11px] px-2 py-1 rounded bg-zinc-900/70">{status==='running'?'Live':'Ready'}</div>
       </div>
     </div>
   );

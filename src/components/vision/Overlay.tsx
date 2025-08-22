@@ -5,7 +5,7 @@ type Track = import('../../vision/types').Track;
 export default function Overlay({
   dets, tracks, video, motion, faces, pose, qr, ocr, scene
 }: {
-  dets: Det[]; tracks: Track[]; video: HTMLVideoElement | null;
+  dets: Det[]; tracks: Track[]; video?: HTMLVideoElement | null;
   motion: {grid:Float32Array,w:number,h:number} | null;
   faces?: Face[]; pose?: Pose | null; qr?: QRHit | null; ocr?: OCRHit | null; scene?: SceneSense | null;
 }) {

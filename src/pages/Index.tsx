@@ -1,11 +1,11 @@
 import { JupiterChat } from "@/components/JupiterChat";
-import ThoughtsDock from '../components/ThoughtsDock';
 
 const Index = () => {
   return (
-    <div className="flex items-center justify-center min-h-screen w-full">
-      <JupiterChat />
-      <ThoughtsDock />
+    <div className="min-h-screen bg-[#0b0c10] flex items-center justify-center">
+      <div className="relative">
+        <JupiterChat />
+      </div>
     </div>
   );
 };

@@ -1,19 +1,7 @@
-export type Thought = { t: number; text: string };
-type Sub = (items: Thought[]) => void;
-
-const MAX = 100;
-let items: Thought[] = [];
-const subs = new Set<Sub>();
-
-export function think(text: string) {
-  if (items[0]?.text === text) return; // avoid immediate duplicates
-  items.unshift({ t: Date.now(), text });
-  if (items.length > MAX) items.length = MAX;
-  subs.forEach(fn => { try { fn(items); } catch {} });
-}
-
-export function getThoughts() { return items.slice(); } // Export getThoughts
-export function onThoughts(fn: Sub) {
-  subs.add(fn); fn(items);
-  return () => { subs.delete(fn); }; // Ensure void return
-}
+export type Thought = { t:number; text:string };
+type Sub = (xs:Thought[])=>void;
+const MAX=80; let xs:Thought[]=[]; const S=new Set<Sub>();
+export function think(text:string){ if(!text) return; if(xs[0]?.text===text) return;
+  xs=[{t:Date.now(),text},...xs].slice(0,MAX); S.forEach(f=>{try{f(xs);}catch{}});}
+export function getThoughts() { return xs.slice(); }
+export function onThoughts(f:Sub){ S.add(f); f(xs); return ()=>{S.delete(f);}; } // Ensure void return
