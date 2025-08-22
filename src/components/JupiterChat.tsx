@@ -16,13 +16,12 @@ import { SpotlightCard } from '@/components/SpotlightCard';
 import { AnimatePresence, motion } from 'framer-motion';
 import { chat, type Msg } from '../runtime/brain.ts';
 import { speak } from '../runtime/voice.ts';
-import { startListening, type ListenCtrl } from '../runtime/listen.ts';
-import { startWakeWord, type WakeCtrl } from '../runtime/wake.ts';
-import { registerSpotlight, type Panel } from '../runtime/ui.ts';
+import { startMicStream, detectSilence } from '../runtime/audio.ts';
+import { startRecordingFromStream, transcribeOnce } from '../runtime/stt_hf.ts';
 import { matchAction, performAction } from '../runtime/actions.ts';
 import { PanelType } from '@/state/spotlight'; // Import PanelType for mapping
 import { webSpeechAvailable, getMicPermission } from '../runtime/cap.ts';
-import { startRecording, transcribeOnce, type RecorderCtrl } from '../runtime/stt_hf.ts';
+import { registerSpotlight, type Panel } from '../runtime/ui.ts'; // Ensure this import is present and correct
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -37,10 +36,10 @@ const defaultSettings = {
 export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
   const [micOn, setMicOn] = useState(false);
-  const [micState, setMicState] = useState<'idle'|'listening'|'recording'|'transcribing'>('idle');
-  const wakeCtrlRef = React.useRef<WakeCtrl | null>(null);
-  const recRef = React.useRef<RecorderCtrl | null>(null);
-  const listenCtrlRef = React.useRef<ListenCtrl | null>(null);
+  const [micState, setMicState] = useState<'idle'|'recording'|'transcribing'>('idle');
+  const micStreamRef = React.useRef<MediaStream|null>(null);
+  const silenceRef = React.useRef<{ stop():void }|null>(null);
+  const recRef = React.useRef<{ stop():Promise<Blob> }|null>(null);
   const [isDropping, setIsDropping] = useState(false);
   const { startRecording: asrStartRecording, stopRecording: asrStopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak: ttsSpeak, isSpeaking } = useJupiterTTS();
@@ -50,6 +49,7 @@ export const JupiterChat: React.FC = () => {
   const spotlight = useSpotlight();
 
   useEffect(() => {
+    // This registers the spotlight API with the runtime module
     registerSpotlight({
       open(panel?: Panel) {
         if (panel === 'home' || !panel) {
@@ -80,7 +80,7 @@ export const JupiterChat: React.FC = () => {
   };
 
   const [isLoading, setIsLoading] = useState(false);
-  const glowLevel = useGlowLevel(micOn || isSpeaking || isLoading || spotlight.isVisible);
+  const glowLevel = useGlowLevel(micOn || isLoading || spotlight.isVisible);
 
   useEffect(() => {
     document.body.classList.add("dark");
@@ -174,56 +174,41 @@ export const JupiterChat: React.FC = () => {
   }
 
   const onMicToggle = async () => {
-    // Turning OFF:
+    // Turning OFF → finalize transcription if recording
     if (micOn) {
       setMicOn(false);
-      setMicState('idle');
-      try { wakeCtrlRef.current?.stop(); wakeCtrlRef.current = null; } catch {}
-      try { listenCtrlRef.current?.stop(); listenCtrlRef.current = null; } catch {}
+      silenceRef.current?.stop(); silenceRef.current = null;
+      setMicState('transcribing');
       try {
-        if (recRef.current) {
-          setMicState('transcribing');
-          const blob = await recRef.current.stop();
-          recRef.current = null;
-          const text = await transcribeOnce(blob);
-          setMicState('idle');
-          if (text) await handleUserText(text);
-        }
-      } catch(e) {
+        const blob = await recRef.current?.stop();
+        recRef.current = null;
+        // stop tracks
+        try { micStreamRef.current?.getTracks().forEach(t=>t.stop()); } catch {}
+        const text = blob ? await transcribeOnce(blob) : '';
         setMicState('idle');
-        console.error(e);
-        toast.error("Could not transcribe audio. Check HF token.");
+        if (text) await handleUserText(text);
+      } catch {
+        setMicState('idle');
+      } finally {
+        micStreamRef.current = null;
       }
       return;
     }
 
-    // Turning ON:
-    const allow = await getMicPermission();
-    if (allow === 'denied') {
-      toast.error('Microphone is blocked. Please allow it in your browser settings.');
-      return;
-    }
-
-    setMicOn(true);
-    if (webSpeechAvailable() && settings.wakeWord) {
-      setMicState('listening');
-      wakeCtrlRef.current = startWakeWord(async (utterance) => {
-        await handleUserText(utterance);
-      }, {
-        onHeard: (_t, _f) => {}, // keep quiet; Jupiter speaks only when relevant
-      });
-      return;
-    }
-    
-    // Fallback push-to-talk:
-    setMicState('recording');
+    // Turning ON → start stream, recorder, and silence detector
     try {
-      recRef.current = await startRecording();
+      const stream = await startMicStream();
+      micStreamRef.current = stream;
+      recRef.current = await startRecordingFromStream(stream);
+      silenceRef.current = detectSilence(stream, { silenceMs: 3000, threshold: 0.02 }, async () => {
+        // Auto-stop after 3s quiet
+        if (!micOn) return;
+        await onMicToggle(); // re-use the off path
+      });
+      setMicOn(true);
+      setMicState('recording');
     } catch (e) {
-      console.error(e);
-      toast.error("Could not start recording. Is the mic connected?");
-      setMicOn(false);
-      setMicState('idle');
+      toast.error('Microphone unavailable. Please allow it in your browser settings.');
     }
   };
 
@@ -378,9 +363,7 @@ export const JupiterChat: React.FC = () => {
                   />
                   {micState !== 'idle' && (
                     <span className="absolute right-3 text-xs opacity-70 pointer-events-none">
-                      {micState === 'listening' ? 'Listening…' :
-                       micState === 'recording' ? 'Recording…' :
-                       'Transcribing…'}
+                      {micState === 'recording' ? 'Recording…' : 'Transcribing…'}
                     </span>
                   )}
                 </div>

@@ -18,22 +18,17 @@ function pickMime(): string | undefined {
 
 export type RecorderCtrl = { stop(): Promise<Blob> };
 
-export async function startRecording(): Promise<RecorderCtrl> {
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error("Mic not available");
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+export async function startRecordingFromStream(stream: MediaStream): Promise<RecorderCtrl> {
   const mime = pickMime();
   const opts = mime ? { mimeType: mime } : undefined as any;
   const rec = new MediaRecorder(stream, opts);
   const chunks: BlobPart[] = [];
   rec.ondataavailable = (e) => { if (e.data?.size) chunks.push(e.data); };
-  rec.start(250); // small timeslice → fewer “onstop” races
+  rec.start(250);
   return {
     stop(): Promise<Blob> {
       return new Promise((resolve) => {
-        rec.onstop = () => {
-          try { stream.getTracks().forEach(t => t.stop()); } catch {}
-          resolve(new Blob(chunks, { type: mime || 'audio/webm' }));
-        };
+        rec.onstop = () => resolve(new Blob(chunks, { type: mime || 'audio/webm' }));
         try { rec.stop(); } catch { resolve(new Blob(chunks)); }
       });
     },
