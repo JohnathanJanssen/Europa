@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { speak } from './voice'; // Add this import
 
 export type Msg = { role:'system'|'user'|'assistant', content:string };
 
@@ -46,11 +45,6 @@ export async function chat(messages: Msg[]): Promise<string> {
   if (HF_TOKEN){ try { return await chatHF(fullMessages); } catch {} }
   const last = [...messages].reverse().find(m=>m.role==='user')?.content || '';
   return `…${last}`;
-}
-
-export async function onModelReply(text: string){
-  // keep your existing UI append logic; just ensure we call speak.
-  try{ await speak(text); }catch{}
 }
 
 export function useBrain() {

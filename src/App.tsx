@@ -10,7 +10,6 @@ import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
 import { SpotlightProvider } from './state/spotlight';
 import { ThemeProvider } from "next-themes";
-import Cosmos from "./ui/Cosmos";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +18,6 @@ function App() {
     <BrowserRouter>
       <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
         <SpotlightProvider>
-          <Cosmos />
           <div className="min-h-screen bg-background font-sans antialiased">
             <Routes>
               <Route path="/" element={<Index />} />
