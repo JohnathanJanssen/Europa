@@ -10,17 +10,19 @@ import { classifyScene } from '../../vision/skills/scene';
 import { scanCenterText } from '../../vision/skills/ocr';
 import { think } from '../../vision/thoughts/bus';
 import { visionBus } from '../../runtime/visionBus';
+import VisionBoundary from '../VisionBoundary';
 
-export default function LiveCamera(){
+function Inner(){
+  const mounted = useRef(true);
+  useEffect(()=>()=>{ mounted.current=false; },[]);
   const videoRef=useRef<HTMLVideoElement|null>(null);
-  const timersRef=useRef<number[]>([]);
-  const askRef   =useRef({ waiting:false, coolUntil:0, lastSig:'' });
+  const timers: number[] = [];
+  const clearTimers=()=>{ timers.forEach(id=>clearInterval(id)); };
 
   const [cams,setCams]=useState<{id:string;label:string}[]>([]);
   const [activeId,setActiveId]=useState<string>();
   const [stream,setStream]=useState<MediaStream|null>(null);
   const [status,setStatus]=useState<'idle'|'loading'|'running'>('idle');
-  const [busy,setBusy]=useState(false);
 
   const [dets,setDets]=useState<Det[]>([]);
   const [tracks,setTracks]=useState<Track[]>([]);
@@ -39,61 +41,52 @@ export default function LiveCamera(){
   const [ocrOn,setOCROn]=useState(false);
 
   useEffect(()=>{ (async()=>{ const L=await listCameras(); setCams(L.map(d=>({id:d.deviceId,label:d.label||'Camera'}))); if(!activeId && L[0]) setActiveId(L[0].deviceId); })(); },[]);
-  function clearTimers(){ timersRef.current.forEach(id=>clearInterval(id)); timersRef.current=[]; }
-  function cleanup(){ clearTimers(); stopStream(stream); setStatus('idle'); visionBus.setOnline(false); }
-
-  // enroll from chat
-  useEffect(()=>visionBus.onEnroll.on(({name})=>{
-    think(`enrolled: ${name}`);
-    askRef.current.waiting=false;
-  }),[]);
+  function cleanup(){
+    clearTimers();
+    stopStream(stream);
+    setStatus('idle');
+    visionBus.setOnline(false);
+  }
+  useEffect(()=>visionBus.onEnroll.on(()=>{/* stop waiting loop on enroll */}),[]);
 
   useEffect(()=>{ if(!activeId) return;
     (async()=>{
-      cleanup(); setBusy(true); setStatus('loading');
+      cleanup(); setStatus('loading');
       try{
-        const s=await startCamera(activeId); setStream(s);
-        const v=videoRef.current!; v.srcObject=s; await v.play(); await waitForVideoReady(v);
+        const s=await startCamera(activeId); if(!mounted.current) return;
+        setStream(s);
+        const v=videoRef.current; if(!v) return;
+        v.srcObject=s; await v.play(); await waitForVideoReady(v);
 
         const engine=new VisionEngine(v); engine.fps=6; engine.minScore=0.30;
         await engine.start(({tracks,dets,insights, motion})=>{
-          if(!analyze) return;
+          if(!mounted.current || !analyze) return;
           setTracks(tracks); setDets(dets); setMotion(motion);
           insights.forEach(i=>{ if(i.kind==='count'){ const best=Object.entries(i.counts).sort((a,b)=>b[1]-a[1])[0]; if(best) think(`seeing ${best[1]} ${best[0]}`); }});
         });
 
-        // recognizer
         const recog=new Recognizer(v);
         recog.start((fs)=>{
-          if(!analyze || !facesOn) return;
+          if(!mounted.current || !analyze || !facesOn) return;
           setFaces(fs);
-          const known = fs.filter(f=>f.name).map(f=>f.name);
-          if(known.length) think(`with ${Array.from(new Set(known)).join(', ')}`);
-
-          // Stable unknown detection → single ask with cooldown
-          const u = fs.find(f=>!f.name); if(!u) return;
-          const sig = (u as any).signature || `${Math.round(u.x||0)}:${Math.round(u.y||0)}:${Math.round(u.w||0)}:${Math.round(u.h||0)}`;
-          const now=Date.now();
-          if (askRef.current.waiting) return;
-          if (now < askRef.current.coolUntil && sig===askRef.current.lastSig) return;
-
-          askRef.current.waiting=true;
-          askRef.current.lastSig=sig;
-          askRef.current.coolUntil=now+90_000; // 90s
-          visionBus.requestIdentity(sig);
+          const u = fs.find(f=>!f.name);
+          if (u){
+            const sig = (u as any).signature || `${Math.round(u.x||0)}:${Math.round(u.y||0)}:${Math.round(u.w||0)}:${Math.round(u.h||0)}`;
+            visionBus.requestIdentity(sig);
+          }
         });
 
-        const every=(ms:number,fn:()=>void)=>{ fn(); const id=window.setInterval(fn,ms); timersRef.current.push(id); };
-        every(250,  async()=>{ if(poseOn  && analyze) setPose(await detectPose(v)); });
-        every(1000,      ()=>{ if(qrOn    && analyze) setQR(scanQR(v) || null); });
-        every(2500, async()=>{ if(sceneOn && analyze) setScene(await classifyScene(v)); });
-        every(4000, async()=>{ if(ocrOn   && analyze) setOCR(await scanCenterText(v) || null); });
+        const every=(ms:number,fn:()=>void)=>{ fn(); const id=window.setInterval(fn,ms); timers.push(id); };
+        every(250,  async()=>{ if(poseOn  && analyze && mounted.current) setPose(await detectPose(v)); });
+        every(1000,      ()=>{ if(qrOn    && analyze && mounted.current) setQR(scanQR(v) || null); });
+        every(2500, async()=>{ if(sceneOn && analyze && mounted.current) setScene(await classifyScene(v)); });
+        every(4000, async()=>{ if(ocrOn   && analyze && mounted.current) setOCR(await scanCenterText(v) || null); });
 
         setStatus('running'); visionBus.setOnline(true);
-      } finally { setBusy(false); }
+      } catch { /* swallow */ }
     })();
     return cleanup;
-  },[activeId,analyze,facesOn,poseOn,qrOn,sceneOn,ocrOn]);
+  },[activeId]);
 
   return (
     <div className="w-full h-[360px] rounded-xl overflow-hidden bg-black relative">
@@ -109,5 +102,13 @@ export default function LiveCamera(){
         <div className="ml-auto text-[11px] px-2 py-1 rounded bg-zinc-900/70">{status==='running'?'Live':'Ready'}</div>
       </div>
     </div>
+  );
+}
+
+export default function LiveCamera(){
+  return (
+    <VisionBoundary>
+      <Inner/>
+    </VisionBoundary>
   );
 }

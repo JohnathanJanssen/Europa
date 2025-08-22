@@ -5,7 +5,7 @@ class UIBus {
   private mode: Mode = 'front';
   private L = new Set<Listener>();
   get() { return this.mode; }
-  set(m: Mode) { if (m !== this.mode) { this.mode = m; this.L.forEach(fn=>fn(m)); } }
+  set(m: Mode) { if (m !== this.mode) { this.mode = m; this.L.forEach(fn => fn(m)); } }
   on(fn: Listener) { this.L.add(fn); return () => { this.L.delete(fn); }; } // Explicitly return void
   openVision()   { this.set('vision'); }
   openSettings() { this.set('settings'); }

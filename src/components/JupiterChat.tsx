@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Mic, Send, Settings, Trash2, Terminal, Eye } from "lucide-react";
+import { Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useJupiterASR } from "@/hooks/use-jupiter-asr";
@@ -11,15 +11,10 @@ import { useJupiterTerminal } from "@/hooks/use-jupiter-terminal";
 import { useGlowLevel } from "@/components/Waveform";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { AnimatePresence, motion } from 'framer-motion';
 import { chat, type Msg } from '../runtime/brain.ts';
-import { startMicStream, detectSilence } from '../runtime/audio.ts';
-import { startRecordingFromStream, transcribeOnce } from '../runtime/stt_hf.ts';
 import { matchAction, performAction } from '../runtime/actions.ts';
-import { webSpeechAvailable, getMicPermission } from '../runtime/cap.ts';
-import FlipTile from './FlipTile';
+import WidgetShell from './WidgetShell';
 import SpotlightCard from './SpotlightCard';
-import ThoughtsBubble from './ThoughtsBubble';
 import { uiBus } from '../runtime/uiBus';
 import { visionBus } from '../runtime/visionBus';
 import { speak } from '../runtime/voice';
@@ -37,60 +32,34 @@ const defaultSettings = {
 
 export const JupiterChat: React.FC = () => {
   const [input, setInput] = useState("");
-  const [micOn, setMicOn] = useState(false);
-  const [micState, setMicState] = useState<'idle'|'recording'|'transcribing'>('idle');
-  const micStreamRef = React.useRef<MediaStream|null>(null);
-  const silenceRef = React.useRef<{ stop():void }|null>(null);
-  const recRef = React.useRef<{ stop():Promise<Blob> }|null>(null);
   const [isDropping, setIsDropping] = useState(false);
-  const { startRecording: asrStartRecording, stopRecording: asrStopRecording, audioBlob, isTranscribing, transcript } = useJupiterASR();
   const { speak: ttsSpeak, isSpeaking } = useJupiterTTS();
-  const { classifyEmotion } = useJupiterEmotion();
   const { sendMessage, messages, isLoading: openAiIsLoading } = useOpenAIChat();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const off = visionBus.onAskIdentity.on(({sig}) => {
-      const line = "I don't recognize you yet. What should I call you?";
-      think('requesting identity');
-      const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: line, id: Date.now().toString() };
-      setChatHistory(prev => [...prev, assistantMessage]);
-      try { speak?.(line); } catch {}
-      (window as any).__jupiter_waitingForName = true;
-    });
-    return () => off();
-  }, []);
+  const [forceReply,setForceReply] = useState(false);
+  const [mode,setMode] = useState(uiBus.get());
+  useEffect(()=>uiBus.on(setMode),[]);
+  useEffect(()=>visionBus.onAskIdentity.on(()=>{
+    think('requesting identity');
+    const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: "I don't recognize you yet. What should I call you?", id: Date.now().toString() };
+    setChatHistory(prev => [...prev, assistantMessage]);
+    try{speak?.("I don't recognize you yet. What should I call you?");}catch{}
+    setForceReply(true);
+    if (mode!=='vision') uiBus.openVision();
+  }),[mode]);
 
   // Hooks for tools
   const { runCommand } = useJupiterTerminal();
   const { listFiles, readFile, writeFile, deleteFile, createDirectory, renameFile } = useJupiterFiles();
 
-  const toolImplementations = {
-    run_command: runCommand,
-    list_files: listFiles,
-    read_file: readFile,
-    write_file: writeFile,
-    delete_file: deleteFile,
-    create_directory: createDirectory,
-    rename_file: renameFile, // Corrected: rename_file to renameFile
-  };
-
   const [isLoading, setIsLoading] = useState(false);
-  const glowLevel = useGlowLevel(micOn || isLoading);
+  const glowLevel = useGlowLevel(isLoading);
 
   useEffect(() => {
     document.body.classList.add("dark");
     return () => document.body.classList.remove("dark");
   }, []);
-
-  const [settings, setSettings] = useState(() => {
-    try {
-      const stored = localStorage.getItem(SETTINGS_KEY);
-      return stored ? { ...defaultSettings, ...JSON.parse(stored) } : defaultSettings;
-    } catch {
-      return defaultSettings;
-    }
-  });
 
   const [chatHistory, setChatHistory] = useState<(Msg & { id: string, imageUrl?: string })[]>(() => {
     try {
@@ -108,14 +77,15 @@ export const JupiterChat: React.FC = () => {
   async function handleUserText(text: string, imageUrl?: string) {
     const raw = text.trim();
 
-    if ((window as any).__jupiter_waitingForName && raw) {
-      (window as any).__jupiter_waitingForName = false;
+    if (forceReply && raw) {
       const name = raw.replace(/^i['’]m\s+/i,'').replace(/^my name is\s+/i,'').trim();
-      visionBus.enroll({name});
+      visionBus.enroll(name);
       const line = `Nice to meet you, ${name}. I’ll remember you.`;
       const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: line, id: Date.now().toString() };
       setChatHistory(prev => [...prev, assistantMessage]);
-      try { speak?.(line); } catch {}
+      try{speak?.(line);}catch{}
+      setForceReply(false);
+      if (mode!=='front') uiBus.back();
       return;
     }
 
@@ -158,41 +128,6 @@ export const JupiterChat: React.FC = () => {
       setIsLoading(false);
     }
   }
-
-  const onMicToggle = async () => {
-    if (micOn) {
-      setMicOn(false);
-      silenceRef.current?.stop(); silenceRef.current = null;
-      setMicState('transcribing');
-      try {
-        const blob = await recRef.current?.stop();
-        recRef.current = null;
-        try { micStreamRef.current?.getTracks().forEach(t=>t.stop()); } catch {}
-        const text = blob ? await transcribeOnce(blob) : '';
-        setMicState('idle');
-        if (text) await handleUserText(text);
-      } catch {
-        setMicState('idle');
-      } finally {
-        micStreamRef.current = null;
-      }
-      return;
-    }
-
-    try {
-      const stream = await startMicStream();
-      micStreamRef.current = stream;
-      recRef.current = await startRecordingFromStream(stream);
-      silenceRef.current = detectSilence(stream, { silenceMs: 3000, threshold: 0.02 }, async () => {
-        if (!micOn) return;
-        await onMicToggle();
-      });
-      setMicOn(true);
-      setMicState('recording');
-    } catch (e) {
-      toast.error('Microphone unavailable. Please allow it in your browser settings.');
-    }
-  };
 
   const handleSend = async (text: string, imageUrl?: string) => {
     if (!text.trim() && !imageUrl) return;
@@ -290,9 +225,6 @@ export const JupiterChat: React.FC = () => {
         </div>
         <div className="pt-0">
           <div className="flex items-center gap-2">
-            <Button variant={micOn ? "destructive" : "outline"} size="icon" onClick={onMicToggle} aria-label="Push to talk" className={`rounded-full ${micOn ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
-              <Mic className={micOn ? "animate-pulse text-pink-400" : "text-blue-400"} />
-            </Button>
             <div className="flex-1 flex flex-col">
               <div className="relative flex items-center">
                 <Input
@@ -302,13 +234,8 @@ export const JupiterChat: React.FC = () => {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter") handleSend(input); }}
                   disabled={isLoading}
-                  style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122", paddingRight: micState !== 'idle' ? '110px' : '1rem' }}
+                  style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
                 />
-                {micState !== 'idle' && (
-                  <span className="absolute right-3 text-xs opacity-70 pointer-events-none">
-                    {micState === 'recording' ? 'Recording…' : 'Transcribing…'}
-                  </span>
-                )}
               </div>
             </div>
             <Button onClick={() => handleSend(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
@@ -321,25 +248,23 @@ export const JupiterChat: React.FC = () => {
   );
 
   return (
-    <FlipTile
+    <WidgetShell
       front={
-        <div className="relative" data-jupiter-root>
-          <ThoughtsBubble />
-          <div className="absolute -top-3 right-2 z-40 flex gap-2">
-            <button title="Vision" onClick={()=>uiBus.openVision()} className="text-xs bg-zinc-900/80 border border-zinc-800 rounded-md px-2 py-1">👁</button>
-            <button title="Settings" onClick={()=>uiBus.openSettings()} className="text-xs bg-zinc-900/80 border border-zinc-800 rounded-md px-2 py-1">⚙︎</button>
-            <button title="Terminal" onClick={()=>uiBus.openTerminal()} className="text-xs bg-zinc-900/80 border border-zinc-800 rounded-md px-2 py-1">⌥</button>
-          </div>
+        <div className="relative">
           {chatUi}
         </div>
       }
       back={
         <div className="relative">
-          <ThoughtsBubble />
-          <div className="absolute -top-3 left-2 z-40">
-            <button onClick={()=>uiBus.back()} className="text-xs bg-zinc-900/80 border border-zinc-800 rounded-md px-2 py-1">↩︎</button>
-          </div>
           <SpotlightCard />
+          {forceReply && (
+            <div className="absolute left-3 right-3 bottom-3 z-40">
+              <form onSubmit={(e)=>{e.preventDefault(); const i=(e.target as any).q; const v=i.value.trim(); if(!v) return; handleUserText(v); i.value=''; }}>
+                <input name="q" placeholder="Type your name…" autoFocus
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-900/85 px-3 py-2 text-sm text-zinc-100 outline-none" />
+              </form>
+            </div>
+          )}
         </div>
       }
     />

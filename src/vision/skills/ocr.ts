@@ -3,7 +3,8 @@ import { createWorker, WorkerOptions } from 'tesseract.js';
 let worker: any = null;
 export async function ensureOCR() {
   if (worker) return worker;
-  // For tesseract.js v6, createWorker expects Partial<WorkerOptions> as its first argument.
+  // For tesseract.js, pass the options object directly as the first argument
+  // when not specifying a custom worker path or language as a positional argument.
   worker = await createWorker({ logger: () => {} } as Partial<WorkerOptions>);
   await worker.loadLanguage('eng'); await worker.initialize('eng');
   return worker;
