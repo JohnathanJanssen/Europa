@@ -1,13 +1,14 @@
-import { createWorker, WorkerOptions } from 'tesseract.js'; // Correctly import WorkerOptions as a named export
+import { createWorker, WorkerOptions, OEM, PSM } from 'tesseract.js'; // Correctly import WorkerOptions, OEM, and PSM
 
 let _worker: any;
 export async function ensureWorker() {
   if (_worker) return _worker;
-  // Pass the language ('eng') as the first argument, and the options object as the second.
-  _worker = await createWorker('eng', { logger: ()=>{} } as Partial<WorkerOptions>);
-  // The language is already loaded by createWorker('eng', ...) when 'eng' is passed as the first argument,
-  // so we only need to initialize it.
-  await _worker.initialize('eng');
+  // Create the worker with the logger option.
+  _worker = await createWorker({ logger: ()=>{} } as Partial<WorkerOptions>);
+  // Load the language.
+  await _worker.loadLanguage('eng');
+  // Initialize the worker with the language, OEM, and PSM.
+  await _worker.initialize('eng', OEM.DEFAULT, PSM.AUTO);
   return _worker;
 }
 export async function scanCenterText(video: HTMLVideoElement | null){
