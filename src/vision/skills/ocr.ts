@@ -3,9 +3,10 @@ import { createWorker, WorkerOptions } from 'tesseract.js'; // Correctly import 
 let _worker: any;
 export async function ensureWorker() {
   if (_worker) return _worker;
-  // Pass undefined as the first argument (for languages) and the options object as the second.
-  _worker = await createWorker(undefined, { logger: ()=>{} } as Partial<WorkerOptions>);
-  await _worker.loadLanguage('eng'); await _worker.initialize('eng');
+  // Pass the language ('eng') as the first argument and the options object as the second.
+  _worker = await createWorker('eng', { logger: ()=>{} } as Partial<WorkerOptions>);
+  // The language is already loaded by createWorker('eng', ...), so initialize directly.
+  await _worker.initialize('eng');
   return _worker;
 }
 export async function scanCenterText(video: HTMLVideoElement | null){

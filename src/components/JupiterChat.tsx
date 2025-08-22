@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Send, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,12 +6,7 @@ import { useGlowLevel } from "@/components/Waveform";
 import { toast } from "sonner";
 import { chat, type Msg } from '../runtime/brain.ts';
 import { matchAction, performAction } from '../runtime/actions.ts';
-import HeaderBar from './HeaderBar';
-import FlipFrame from './FlipFrame';
-import SpotlightCard from './SpotlightCard';
-import { uiBus } from '../runtime/uiBus';
-import { visionBus } from '../runtime/visionBus';
-import { speak } from '../runtime/voice';
+import ThoughtsBubble from './ThoughtsBubble';
 
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
 
@@ -20,10 +15,6 @@ export const JupiterChat: React.FC = () => {
   const [isDropping, setIsDropping] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const glowLevel = useGlowLevel(isLoading);
-
-  const [mode, setMode] = useState(uiBus.get());
-  useEffect(()=>uiBus.on(setMode),[]);
-  const [forceReply, setForceReply] = useState(false);
 
   const [chatHistory, setChatHistory] = useState<(Msg & { id: string, imageUrl?: string })[]>(() => {
     try {
@@ -36,16 +27,14 @@ export const JupiterChat: React.FC = () => {
     localStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(chatHistory));
   }, [chatHistory]);
 
-  const addAssistant = (content: string) => {
-    setChatHistory(prev => [...prev, { role: 'assistant', content, id: Date.now().toString() }]);
-  };
-
-  useEffect(() => visionBus.onAskIdentity.on(() => {
-    addAssistant("I don't recognize you yet. What should I call you?");
-    try { speak?.("I don't recognize you yet. What should I call you?"); } catch {}
-    if (mode!=='vision') uiBus.openVision();
-    setForceReply(true);
-  }), [mode]);
+  useEffect(() => {
+    (window as any).JUP_goVision   = () => document.dispatchEvent(new CustomEvent("JUP:face", { detail: "vision" }));
+    (window as any).JUP_goTerminal = () => document.dispatchEvent(new CustomEvent("JUP:face", { detail: "terminal" }));
+    (window as any).JUP_goSettings = () => document.dispatchEvent(new CustomEvent("JUP:face", { detail: "settings" }));
+    return () => {
+      (window as any).JUP_goVision = (window as any).JUP_goTerminal = (window as any).JUP_goSettings = undefined;
+    };
+  }, []);
 
   async function sendUserMessage(text: string, imageUrl?: string) {
     const userMessage: (Msg & { id: string, imageUrl?: string }) = {
@@ -57,8 +46,8 @@ export const JupiterChat: React.FC = () => {
     try {
       const historyForApi = newHistory.map(({ role, content }) => ({ role, content }));
       const reply = await chat(historyForApi);
-      await speak(reply);
-      addAssistant(reply);
+      const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: reply, id: (Date.now() + 1).toString() };
+      setChatHistory(prev => [...prev, assistantMessage]);
     } catch (e) {
       console.error(e);
       toast.error("I was unable to get a reply. Please check your API keys.");
@@ -72,21 +61,10 @@ export const JupiterChat: React.FC = () => {
     if (!raw) return;
     setInput("");
 
-    if (forceReply) {
-      const name = raw.replace(/^i['’]m\s+/i,'').replace(/^my name is\s+/i,'').trim();
-      visionBus.enroll(name);
-      addAssistant(`Nice to meet you, ${name}. I’ll remember you.`);
-      try { speak?.(`Nice to meet you, ${name}. I’ll remember you.`); } catch {}
-      setForceReply(false);
-      if (mode!=='front') uiBus.back();
-      return;
-    }
-
     const t = raw.toLowerCase();
-    if (/^open (vision|camera)\b/.test(t)) { uiBus.openVision(); return; }
-    if (/^open settings\b/.test(t))       { uiBus.openSettings(); return; }
-    if (/^open terminal\b/.test(t))       { uiBus.openTerminal(); return; }
-    if (/^close( spotlight)?\b/.test(t))  { uiBus.back(); return; }
+    if (/^open (vision|camera)\b/.test(t)) { (window as any).JUP_goVision?.(); return; }
+    if (/^open settings\b/.test(t))       { (window as any).JUP_goSettings?.(); return; }
+    if (/^open terminal\b/.test(t))       { (window as any).JUP_goTerminal?.(); return; }
 
     const action = matchAction(raw);
     if (action) {
@@ -110,8 +88,6 @@ export const JupiterChat: React.FC = () => {
     setIsDropping(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      // This logic needs to be adapted to the new handleSubmit flow
-      // For now, we'll just send the file content as a message
       const reader = new FileReader();
       reader.onload = (event) => {
         const content = event.target?.result as string;
@@ -158,45 +134,40 @@ export const JupiterChat: React.FC = () => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === "Enter") onSubmit(input); }}
             disabled={isLoading}
-            autoFocus={forceReply}
             style={{ fontSize: 16, background: "rgba(24,24,42,0.92)", boxShadow: "0 1.5px 8px 0 #6366f122" }}
           />
         </div>
       </div>
-      <Button onClick={() => onSubmit(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
+      <Button onClick={() => handleSubmit(input)} disabled={isLoading || !input.trim()} size="icon" aria-label="Send" className="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-700 hover:from-blue-600 hover:to-purple-600 text-white rounded-full shadow">
         <Send />
       </Button>
     </div>
   );
 
-  const flipped = mode !== 'front';
-
   return (
-    <div className="relative">
-      <div className="relative [perspective:1200px] pt-1">
-        <div className={`relative ${flipped ? '[transform:rotateY(180deg)]' : ''}`}>
-          <FlipFrame
-            front={
-              <div className="rounded-2xl bg-zinc-950/80 border border-zinc-800 p-3" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
-                <HeaderBar />
-                <div className="mt-2">{renderMessages()}</div>
-                <div className="mt-2">{renderInputRow(handleSubmit)}</div>
-              </div>
-            }
-            back={
-              <div className="rounded-2xl bg-zinc-950/80 border border-zinc-800 p-3">
-                <HeaderBar />
-                <div className="mt-2">
-                  <SpotlightCard />
-                </div>
-                {forceReply && (
-                  <div className="mt-2">
-                    {renderInputRow(handleSubmit)}
-                  </div>
-                )}
-              </div>
-            }
-          />
+    <div className="relative flex w-full items-center justify-center">
+      <div className="relative z-10">
+        <div className="mb-2 flex items-center gap-3 px-2 select-none">
+          <div className="w-6" />
+          <div className="text-white/95 font-semibold tracking-[0.22em] text-[13px] md:text-[14px]">JUPITER</div>
+          <div className="flex-1">
+            <ThoughtsBubble variant="inline" />
+          </div>
+          <div className="flex items-center gap-2">
+            <button title="Vision" onClick={() => (window as any).JUP_goVision?.()} className="rounded-xl border border-white/10 bg-white/5 p-1 hover:bg-white/10">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z" stroke="currentColor" strokeWidth="1.5"/><circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5"/></svg>
+            </button>
+            <button title="Terminal" onClick={() => (window as any).JUP_goTerminal?.()} className="rounded-xl border border-white/10 bg-white/5 p-1 hover:bg-white/10">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 6h16v12H4z" stroke="currentColor" strokeWidth="1.5"/><path d="m7 9 3 3-3 3" stroke="currentColor" strokeWidth="1.5"/><path d="M12 15h5" stroke="currentColor" strokeWidth="1.5"/></svg>
+            </button>
+            <button title="Settings" onClick={() => (window as any).JUP_goSettings?.()} className="rounded-xl border border-white/10 bg-white/5 p-1 hover:bg-white/10">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" strokeWidth="1.5"/><path d="M19.4 15.5a7.9 7.9 0 0 0 .1-7l1.7-1.7-2.3-2.3L17.2 4a7.9 7.9 0 0 0-7 0L8.1 2.5 5.8 4.8 7.5 6.5a7.9 7.9 0 0 0 0 7L5.8 15.2l2.3 2.3 1.7-1.7a7.9 7.9 0 0 0 7 0l1.7 1.7 2.3-2.3-1.7-1.7Z" stroke="currentColor" strokeWidth="1.5"/></svg>
+            </button>
+          </div>
+        </div>
+        <div className="rounded-2xl bg-black/60 backdrop-blur-xl border border-white/10 p-2 w-[400px] md:w-[460px] relative" onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}>
+          <div className="mt-2">{renderMessages()}</div>
+          <div className="mt-2">{renderInputRow(handleSubmit)}</div>
         </div>
       </div>
     </div>
