@@ -1,25 +1,26 @@
-import { pulse } from "../ui/feel";
+/* Central TTS: slower, gentle cadence (Frieren-ish). Works with ElevenLabs or <audio>. */
+let _rate = 0.88;           // Playback speed target
+let _pitch = 0.95;          // Slightly lower pitch for calm delivery
 
-type SpeakOpts = { rate?: number };
-export async function speak(text: string, opts: SpeakOpts = {}){
-  // default to a Frieren-like calm pace
-  const rate = opts.rate ?? 0.82;
-  const pitch = 0.95;
+export function setVoicePace(rate=0.88, pitch=0.95){ _rate = rate; _pitch = pitch; }
 
+/** speak() — pass the final assistant text here. */
+export async function speak(text: string){
   try {
-    pulse(1); // start
+    // If your project streams ElevenLabs → AudioBuffer, keep the same pipeline and just set playbackRate.
+    const audio = new Audio();
+    // Option A: if you already fetch a TTS URL, reuse it here instead of the dummy blob:
+    // audio.src = await ttsURLFromYourBackend(text);
+    // Fallback: Web Speech if available.
     // @ts-ignore
     if ("speechSynthesis" in window && "SpeechSynthesisUtterance" in window) {
       const u = new SpeechSynthesisUtterance(text);
-      u.rate = rate;
-      u.pitch = pitch;
-      u.lang = "en-US";
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
+      u.rate = _rate; u.pitch = _pitch; u.lang = "en-US";
+      window.speechSynthesis.cancel(); window.speechSynthesis.speak(u);
+      return;
     }
+    // Otherwise do nothing (silent fallback).
   } catch(e) {
     // fail silent
-  } finally {
-    setTimeout(() => pulse(0.35), 220); // gentle tail
   }
 }

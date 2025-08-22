@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { speak } from "./voice";
 
 export type Msg = { role:'system'|'user'|'assistant', content:string };
 
@@ -36,11 +35,6 @@ async function chatHF(messages: Msg[]): Promise<string> {
   const txt = Array.isArray(j) ? (j[0]?.generated_text ?? '') : (j.generated_text ?? j?.[0]?.generated_text ?? '');
   const out = (txt.split('ASSISTANT:').pop() || txt).trim();
   return out || '…(preview)';
-}
-
-export async function onModelReply(text: string){
-  // your existing UI append logic...
-  speak(text); // speak and pulse background
 }
 
 export async function chat(messages: Msg[]): Promise<string> {
