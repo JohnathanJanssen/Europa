@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { X, Eye, FileText, Code, StickyNote, Settings, Terminal } from 'lucide-react';
 import { SettingsPanel } from '@/components/panels/SettingsPanel.tsx';
 import { TerminalPanel } from '@/components/panels/TerminalPanel.tsx';
+import LiveCamera from '@/components/vision/LiveCamera.tsx';
 
 const PanelContent: React.FC<{ type: string }> = ({ type }) => {
   switch (type) {
     case 'vision':
-      return <VisionPanel />;
+      return <LiveCamera />;
     case 'settings':
       return <SettingsPanel />;
     case 'terminal':

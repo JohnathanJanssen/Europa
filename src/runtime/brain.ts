@@ -1,5 +1,11 @@
 export type Msg = { role:'system'|'user'|'assistant', content:string };
 
+const SYSTEM_BRIEF = [
+  "You are Jupiter. Be extremely concise: 1–2 sentences unless explicitly asked for more.",
+  "If a local action was executed (open settings/terminal/vision/etc.), say nothing.",
+  "Prefer bullet-like clarity over paragraphs. No apologies, no filler."
+].join(" ");
+
 const OAI_KEY   = import.meta.env.VITE_OPENAI_API_KEY as string | undefined;
 const OAI_MODEL = (import.meta.env.VITE_OPENAI_MODEL as string) || 'gpt-4o-mini';
 const HF_TOKEN  = import.meta.env.VITE_HF_TOKEN as string | undefined;
@@ -30,8 +36,11 @@ async function chatHF(messages: Msg[]): Promise<string> {
 }
 
 export async function chat(messages: Msg[]): Promise<string> {
-  if (OAI_KEY) { try { return await chatOpenAI(messages); } catch {} }
-  if (HF_TOKEN){ try { return await chatHF(messages); } catch {} }
+  const sys = { role: 'system', content: SYSTEM_BRIEF } as Msg;
+  const fullMessages = [sys, ...messages];
+
+  if (OAI_KEY) { try { return await chatOpenAI(fullMessages); } catch {} }
+  if (HF_TOKEN){ try { return await chatHF(fullMessages); } catch {} }
   const last = [...messages].reverse().find(m=>m.role==='user')?.content || '';
   return `…${last}`;
 }

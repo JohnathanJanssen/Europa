@@ -295,19 +295,19 @@ export const JupiterChat: React.FC = () => {
           transition: "filter 0.3s, opacity 0.3s, background 0.3s"
         }}
       />
-      <div className="relative z-10 flex flex-col w-full max-w-md mx-auto">
+      <div className="relative z-10 flex flex-col w-full max-w-[360px] mx-auto">
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`relative z-10 flex flex-col w-full bg-black/60 backdrop-blur-xl shadow-2xl border transition-all duration-300 ${isDropping ? 'border-green-400' : 'border-[#2d2d4d]'} ${spotlight.isVisible ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
+          className={`relative z-10 flex flex-col w-full bg-black/60 backdrop-blur-xl shadow-2xl border transition-all duration-300 p-3 ${isDropping ? 'border-green-400' : 'border-[#2d2d4d]'} ${spotlight.isVisible ? 'rounded-t-2xl border-b-0' : 'rounded-2xl'}`}
           style={{
             minWidth: 340,
             boxShadow: `0 8px 32px 0 #000a, 0 1.5px 8px 0 #6366f133, 0 0 32px ${24 + glowLevel * 32}px ${colorMix(glowLevel)}`,
             outline: glowLevel > 0.01 || isDropping ? `2.5px solid ${isDropping ? '#4ade80' : colorMix(glowLevel)}` : "none",
           }}
         >
-          <div className="flex items-center justify-between p-2 pb-0">
+          <div className="flex items-center justify-between">
             <span className="text-lg font-bold text-white tracking-widest select-none" style={{ letterSpacing: 3 }}>JUPITER</span>
             <div className="flex gap-2">
               <Button variant="ghost" size="icon" onClick={handleClearChat} aria-label="Clear Chat" title="Clear Chat" className="text-gray-400 hover:text-pink-400"><Trash2 /></Button>
@@ -315,7 +315,7 @@ export const JupiterChat: React.FC = () => {
               <Button variant="ghost" size="icon" onClick={() => spotlight.open('settings', null, 'Settings')} className="text-gray-400 hover:text-blue-400" title="Open Settings" aria-label="Open Settings"><Settings /></Button>
             </div>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-transparent max-h-[50vh]">
+          <div className="flex-1 overflow-y-auto space-y-3 bg-transparent max-h-[460px]">
             {displayMessages.map((msg: any, index: number) => (
               <div key={msg.id || index} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                 <div
@@ -326,7 +326,7 @@ export const JupiterChat: React.FC = () => {
                   }`}
                 >
                   {msg.imageUrl && <img src={msg.imageUrl} alt="User content" className="rounded-lg mb-2 max-w-full h-auto" />}
-                  <div>{msg.content || msg.text}</div>
+                  <div className="break-words">{msg.content || msg.text}</div>
                 </div>
               </div>
             ))}
@@ -342,7 +342,7 @@ export const JupiterChat: React.FC = () => {
               </div>
             )}
           </div>
-          <div className="p-2 pt-0">
+          <div className="pt-0">
             <div className="flex items-center gap-2">
               <Button variant={micOn ? "destructive" : "outline"} size="icon" onClick={onMicToggle} aria-label="Push to talk" className={`rounded-full ${micOn ? "bg-pink-700" : "bg-gray-800"} text-white shadow`}>
                 <Mic className={micOn ? "animate-pulse text-pink-400" : "text-blue-400"} />
