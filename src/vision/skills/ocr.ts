@@ -1,12 +1,11 @@
-import { createWorker, WorkerOptions, OEM, PSM } from 'tesseract.js'; // Correctly import WorkerOptions, OEM, and PSM
+import { createWorker, WorkerOptions, OEM, PSM } from 'tesseract.js';
 
 let _worker: any;
 export async function ensureWorker() {
   if (_worker) return _worker;
-  // Create the worker with the logger option.
-  _worker = await createWorker({ logger: ()=>{} } as Partial<WorkerOptions>);
-  // Load the language.
-  await _worker.loadLanguage('eng');
+  // Create the worker by explicitly passing the language, OEM.DEFAULT, PSM.AUTO,
+  // and then the options object. This ensures TypeScript picks the correct overload.
+  _worker = await createWorker('eng', OEM.DEFAULT, PSM.AUTO, { logger: ()=>{} } as Partial<WorkerOptions>);
   // Initialize the worker with the language, OEM, and PSM.
   await _worker.initialize('eng', OEM.DEFAULT, PSM.AUTO);
   return _worker;

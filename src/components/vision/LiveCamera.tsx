@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { VisionEngine, Det } from '../../vision/engine';
 import Overlay from './Overlay';
 
-export default function LiveCamera() {
+type LiveCameraProps = { onAskNameSpeak?: (line:string)=>void };
+
+export default function LiveCamera(props: LiveCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [ready, setReady] = useState(false);
   const [dets, setDets] = useState<Det[]>([]);
@@ -15,10 +17,11 @@ export default function LiveCamera() {
   const [name, setName] = useState('');
 
   useEffect(() => {
-    const handleVisibilityChange = () => setIsPaused(document.hidden);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-  }, []);
+    if(askName){
+      const line = "I don't recognize you yet — what should I call you?";
+      props.onAskNameSpeak?.(line);
+    }
+  },[askName, props]);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
