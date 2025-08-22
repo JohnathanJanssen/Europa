@@ -22,6 +22,7 @@ import { matchAction, performAction } from '../runtime/actions.ts';
 import { PanelType } from '@/state/spotlight'; // Import PanelType for mapping
 import { webSpeechAvailable, getMicPermission } from '../runtime/cap.ts';
 import { registerSpotlight, type Panel } from '../runtime/ui.ts'; // Ensure this import is present and correct
+import { visionBus } from '../runtime/visionBus.ts';
 
 const SETTINGS_KEY = "jupiter_settings";
 const CHAT_HISTORY_KEY = "jupiter_chat_history";
@@ -47,6 +48,17 @@ export const JupiterChat: React.FC = () => {
   const { sendMessage, messages, isLoading: openAiIsLoading } = useOpenAIChat();
   const navigate = useNavigate();
   const spotlight = useSpotlight();
+
+  useEffect(() => {
+    const off = visionBus.onAskIdentity.on(() => {
+      const line = "I don't recognize you yet. What should I call you?";
+      const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: line, id: Date.now().toString() };
+      setChatHistory(prev => [...prev, assistantMessage]);
+      try { speak?.(line); } catch {}
+      (window as any).__jupiter_waitingForName = true;
+    });
+    return () => off();
+  }, []);
 
   useEffect(() => {
     // This registers the spotlight API with the runtime module
@@ -139,6 +151,30 @@ export const JupiterChat: React.FC = () => {
   const [pendingSend, setPendingSend] = useState(false);
 
   async function handleUserText(text: string, imageUrl?: string) {
+    const raw = text.trim();
+
+    if ((window as any).__jupiter_waitingForName && raw) {
+      (window as any).__jupiter_waitingForName = false;
+      const name = raw.replace(/^i['’]m\s+/i,'').replace(/^my name is\s+/i,'').trim();
+      visionBus.enroll(name);
+      const line = `Nice to meet you, ${name}. I'll remember you.`;
+      const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: line, id: Date.now().toString() };
+      setChatHistory(prev => [...prev, assistantMessage]);
+      try { speak?.(line); } catch {}
+      return;
+    }
+
+    const t = raw.toLowerCase();
+    const see = /^(what (do|can) you see|do you see|what are you seeing|show me what you see)\b/;
+    if (see.test(t)) {
+      window.dispatchEvent(new CustomEvent('jupiter:command', { detail: { cmd: 'open vision' }}));
+      if (!visionBus.isOnline()) {
+        const assistantMessage: (Msg & { id: string }) = { role: 'assistant', content: 'Opening Vision…', id: Date.now().toString() };
+        setChatHistory(prev => [...prev, assistantMessage]);
+      }
+      return;
+    }
+
     if (!text.trim() && !imageUrl) return;
     setInput("");
 

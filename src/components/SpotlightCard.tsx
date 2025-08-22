@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useSpotlight } from '@/state/spotlight';
 import { Button } from '@/components/ui/button';
 import { X, Eye, FileText, Code, StickyNote, Settings, Terminal } from 'lucide-react';
@@ -37,7 +37,19 @@ const PanelIcon: React.FC<{ type: string; className?: string }> = ({ type, class
 };
 
 export const SpotlightCard: React.FC = () => {
-  const { panels, close } = useSpotlight();
+  const { panels, close, open, setVisible } = useSpotlight();
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const cmd = String(e?.detail?.cmd || '');
+      if (cmd === 'open vision')   { open('vision', null, 'Vision'); }
+      if (cmd === 'open settings') { open('settings', null, 'Settings'); }
+      if (cmd === 'open terminal') { open('terminal', null, 'Terminal'); }
+      if (cmd === 'close spotlight') { setVisible(false); }
+    };
+    window.addEventListener('jupiter:command', handler as any);
+    return () => window.removeEventListener('jupiter:command', handler as any);
+  }, [open, setVisible]);
 
   if (panels.length === 0) {
     return null;
