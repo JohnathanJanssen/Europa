@@ -12,3 +12,12 @@ export type Face = {
   descriptor?: number[];     // 128D embedding when unknown (for naming)
   isNew?: boolean;           // true if we’ve never seen this identity
 };
+
+export type PoseKeypoint = { x:number; y:number; score:number };
+export type Pose = { keypoints: PoseKeypoint[]; score:number };
+
+export type QRHit = { corners:[{x:number;y:number},{x:number;y:number},{x:number;y:number},{x:number;y:number}], text:string };
+
+export type OCRHit = { box:{x:number;y:number;w:number;h:number}; text:string };
+
+export type SceneSense = { label:string; prob:number };

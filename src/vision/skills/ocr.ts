@@ -1,43 +1,23 @@
-import { createWorker, OEM } from 'tesseract.js';
+import { createWorker } from 'tesseract.js';
 
-let worker: Tesseract.Worker | null = null;
-let isInitializing = false;
-
-async function getWorker() {
+let worker: any = null;
+export async function ensureOCR() {
   if (worker) return worker;
-  if (isInitializing) {
-    // Wait for the worker to be initialized by another call
-    return new Promise<Tesseract.Worker>((resolve) => {
-      const interval = setInterval(() => {
-        if (worker) {
-          clearInterval(interval);
-          resolve(worker);
-        }
-      }, 100);
-    });
-  }
-
-  isInitializing = true;
-  console.log("Initializing Tesseract.js worker...");
-  const newWorker = await createWorker('eng', OEM.LSTM_ONLY);
-  worker = newWorker;
-  isInitializing = false;
-  console.log("Tesseract.js worker initialized.");
+  worker = await createWorker({ logger: () => {} });
+  await worker.loadLanguage('eng'); await worker.initialize('eng');
   return worker;
 }
 
-export async function ocrFromCanvas(canvas: HTMLCanvasElement): Promise<string> {
-  try {
-    const tesseractWorker = await getWorker();
-    const { data: { text } } = await tesseractWorker.recognize(canvas);
-    return text;
-  } catch (error) {
-    console.error("OCR failed:", error);
-    // In case of failure, we might want to terminate and recreate the worker
-    if (worker) {
-      await worker.terminate();
-      worker = null;
-    }
-    return "";
-  }
+/** Samples center crop for text; heavy => call sparsely */
+export async function scanCenterText(video: HTMLVideoElement) {
+  const w = video.videoWidth || 640, h = video.videoHeight || 480;
+  if (!w || !h) return null;
+  const rx = Math.floor(w*0.18), ry = Math.floor(h*0.18), rw = Math.floor(w*0.64), rh = Math.floor(h*0.64);
+  const cvs = document.createElement('canvas'); cvs.width=rw; cvs.height=rh;
+  const ctx = cvs.getContext('2d')!; ctx.drawImage(video, rx, ry, rw, rh, 0,0,rw,rh);
+  const wkr = await ensureOCR();
+  const { data } = await wkr.recognize(cvs);
+  const text = (data.text || '').trim();
+  if (!text) return null;
+  return { box:{ x:rx, y:ry, w:rw, h:rh }, text };
 }
