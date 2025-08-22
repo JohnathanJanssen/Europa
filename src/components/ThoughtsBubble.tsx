@@ -1,29 +1,17 @@
-import { useEffect, useState } from "react";
-import { onThoughts, type Thought } from '../vision/thoughts/bus';
+import React from 'react';
 
-function useLatestThoughtText() {
-  const [t, setT] = useState<string>("");
-  useEffect(() => {
-    const unsub = onThoughts((thoughts: Thought[]) => {
-      setT(thoughts[0]?.text || "");
-    });
-    return () => unsub();
-  }, []);
-  return t;
-}
+type Props = { text: string; onHide?: () => void; };
 
-export default function ThoughtsBubble({ variant = "inline" as "inline" | "card" }) {
-  const text = useLatestThoughtText();
-  if (variant === "card") {
-    return (
-      <div className="rounded-xl border border-white/10 bg-black/60 px-3 py-2 text-white/80 text-sm">
-        {text || "Quiet mind."}
-      </div>
-    );
-  }
+export default function ThoughtsBubble({ text, onHide }: Props) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 px-2 py-[2px] text-white/60 text-[12px] truncate max-w-[220px]">
-      {text || "Quiet mind."}
+    <div className="absolute -top-14 left-1/2 -translate-x-1/2 z-10
+                    rounded-2xl bg-[#12131a]/90 text-white/80 border border-white/10
+                    px-4 py-2 shadow-lg backdrop-blur-sm">
+      <div className="flex items-center gap-3 text-xs">
+        <span className="tracking-wide font-semibold text-white/70">THOUGHTS</span>
+        <button onClick={onHide} className="text-white/50 hover:text-white/80">Hide</button>
+      </div>
+      <div className="mt-1 text-sm">{text || 'Quiet mind.'}</div>
     </div>
   );
 }

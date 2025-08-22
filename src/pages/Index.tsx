@@ -1,13 +1,10 @@
-import { JupiterChat } from "@/components/JupiterChat";
+import React from 'react';
+import JupiterChat from '../components/JupiterChat';
 
-const Index = () => {
+export default function IndexPage() {
   return (
-    <div className="min-h-screen bg-[#0b0c10] flex items-center justify-center">
-      <div className="relative">
-        <JupiterChat />
-      </div>
-    </div>
+    <main className="min-h-screen bg-[#080a10]">
+      <JupiterChat />
+    </main>
   );
-};
-
-export default Index;
+}

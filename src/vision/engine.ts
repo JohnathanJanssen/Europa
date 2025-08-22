@@ -1,52 +1,62 @@
-import { loadDetector } from './models';
-import type { Det, Track, Insight } from './types';
-import { Tracker } from './skills/tracker';
-import { Motion } from './skills/motion';
-import { learnFromFrame } from './skills/novelty';
+import * as tf from '@tensorflow/tfjs';
+import * as cocoSsd from '@tensorflow-models/coco-ssd';
+
+export type Det = {
+  bbox: [number, number, number, number]; // x,y,w,h
+  label: string;
+  score: number;
+};
 
 export class VisionEngine {
-  private video: HTMLVideoElement;
+  private model: cocoSsd.ObjectDetection | null = null;
+  private rafId: number | null = null;
   private running = false;
-  public fps = 6;
-  public minScore = 0.30;
-  private tracker = new Tracker();
-  private motion = new Motion();
+  private lastInfer = 0;
+  private minIntervalMs = 80; // ~12.5 FPS (keeps Chrome happy)
 
-  constructor(video: HTMLVideoElement) { this.video = video; }
-
-  async start(onFrame: (state: { tracks: Track[], dets: Det[], insights: Insight[], motion: {grid:Float32Array,w:number,h:number} | null }) => void) {
-    if (this.running) return; this.running = true;
-    const model = await loadDetector();
-    const loop = async () => {
-      if (!this.running) return;
-      let insights: Insight[] = [];
-      let motion = null as {grid:Float32Array,w:number,h:number} | null;
-      try {
-        const preds = await model.detect(this.video, 10);
-        const dets: Det[] = (preds || [])
-          .filter(p => (p.score ?? 0) >= this.minScore)
-          .map(p => { const [x,y,w,h]=p.bbox as [number,number,number,number]; return { x,y,w,h,label:p.class,score:p.score??0 }; });
-        const tracks = this.tracker.update(dets);
-
-        // motion
-        const m = this.motion.analyze(this.video); motion = { grid:m.grid, w:m.w, h:m.h };
-        const maxZone = Object.entries(m.zones).sort((a,b)=>b[1]-a[1])[0] as any;
-        if (maxZone && maxZone[1] > 0.10) { insights.push({ kind:'motion', at:Date.now(), zone:maxZone[0], intensity: maxZone[1] }); }
-
-        // counts
-        const counts: Record<string, number> = {};
-        for (const d of dets) counts[d.label] = (counts[d.label]||0)+1;
-        insights.push({ kind:'count', at:Date.now(), counts });
-
-        // novelty
-        const novel = learnFromFrame(this.video, dets).novel;
-        if (novel) insights.push({ kind:'novel', at:Date.now(), label:novel.label, score:novel.score });
-
-        onFrame({ tracks, dets, insights, motion });
-      } catch { /* swallow */ }
-      if (this.running) setTimeout(loop, 1000/this.fps);
-    };
-    loop();
+  async init() {
+    if (this.model) return;
+    // Force CPU if the device/GPU is flaky:
+    // await tf.setBackend('cpu');  // (uncomment if you see GPU/WebGL crashes)
+    this.model = await cocoSsd.load({ base: 'lite_mobilenet_v2' });
   }
-  stop() { this.running = false; }
+
+  start(videoEl: HTMLVideoElement, onDetections: (dets: Det[]) => void) {
+    if (!this.model || this.running) return;
+    this.running = true;
+
+    const loop = async (t: number) => {
+      if (!this.running || !this.model) return;
+      if (t - this.lastInfer >= this.minIntervalMs) {
+        this.lastInfer = t;
+        try {
+          const preds = await this.model.detect(videoEl);
+          const dets: Det[] = preds.map(p => ({
+            bbox: p.bbox as [number, number, number, number],
+            label: p.class,
+            score: p.score
+          }));
+          onDetections(dets);
+        } catch {
+          // swallow transient errors (camera switching, tab hidden, etc.)
+        }
+      }
+      this.rafId = requestAnimationFrame(loop);
+    };
+    this.rafId = requestAnimationFrame(loop);
+  }
+
+  async stop() {
+    this.running = false;
+    if (this.rafId != null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+  }
+
+  async dispose() {
+    await this.stop();
+    // tfjs models from coco-ssd don’t expose a dispose, but free tensors anyway:
+    try { tf.engine().disposeVariables(); } catch {}
+  }
 }

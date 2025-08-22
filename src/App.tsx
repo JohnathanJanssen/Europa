@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
-import { JupiterChat } from "@/components/JupiterChat";
+import JupiterChat from "@/components/JupiterChat"; // Changed to default import
 import Settings from "./pages/Settings";
 import Tools from "./pages/Tools";
 import { SpotlightProvider } from './state/spotlight';
