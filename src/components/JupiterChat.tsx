@@ -1,18 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Eye, Terminal, Folder, RefreshCw, Send } from 'lucide-react';
-import { usePanel, setPanel } from "../runtime/panel";
 import { speak } from "../runtime/voice";
 import { useBrain } from "../runtime/brain";
-import { useThoughts } from "../vision/thoughts/bus";
+import { useThoughts, think as thoughtsPush } from "../vision/thoughts/bus";
 import ThoughtsPill from "./ThoughtsPill";
-import PanelHost from "./PanelHost";
+import VisionPanel from "./panels/VisionPanel";
+import TerminalPanel from "./panels/TerminalPanel";
+import FilesPanel from "./panels/FilesPanel";
 
 export default function JupiterChat() {
-  const panel = usePanel();
   const thoughts = useThoughts();
   const brain = useBrain();
   const [input, setInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [panel, setPanel] = useState<null | "vision" | "terminal" | "files">(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -36,20 +37,25 @@ export default function JupiterChat() {
     position: 'relative'
   }), []);
 
+  function onOpenVision(){ setPanel("vision"); thoughtsPush("Opening Vision…"); }
+  function onOpenTerminal(){ setPanel("terminal"); thoughtsPush("Opening Terminal…"); }
+  function onOpenFiles(){ setPanel("files"); thoughtsPush("Opening Files…"); }
+  function onRefresh(){ window.location.reload(); }
+
   return (
     <div className="relative grid place-items-center min-h-[70vh]">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,_rgba(120,60,255,0.15),_transparent_60%)]" />
       
       <div className="jupiter-widget rounded-[22px] border border-white/10 bg-[#0d0f16]/80 backdrop-blur-xl shadow-2xl p-6" style={frameStyle}>
         <div className="flex items-center justify-between flex-shrink-0 mb-4">
-          <button onClick={() => setPanel("chat")} className="tracking-[0.25em] text-left">
+          <button onClick={() => setPanel(null)} className="tracking-[0.25em] text-left">
             <span className="text-white text-3xl font-black">JUPITER</span>
           </button>
           <ThoughtsPill text={thoughts} />
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2">
+          <div className="flex-1 overflow-y-auto space-y-3 pr-2 chat-scroll">
             {brain.messages.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`rounded-2xl px-4 py-2 max-w-[80%] shadow break-words ${m.role === 'user' ? 'bg-blue-700 text-white' : 'bg-white/5 text-white/90'}`}>
@@ -77,13 +83,27 @@ export default function JupiterChat() {
         </div>
 
         <div className="mt-4 flex items-center justify-around flex-shrink-0">
-          <button onClick={() => setPanel("vision")} title="Vision" className="p-2 rounded-full hover:bg-white/10 transition"><Eye className="text-white/70" /></button>
-          <button onClick={() => setPanel("terminal")} title="Terminal" className="p-2 rounded-full hover:bg-white/10 transition"><Terminal className="text-white/70" /></button>
-          <button onClick={() => setPanel("files")} title="Files" className="p-2 rounded-full hover:bg-white/10 transition"><Folder className="text-white/70" /></button>
-          <button onClick={() => location.reload()} title="Refresh" className="p-2 rounded-full hover:bg-white/10 transition"><RefreshCw className="text-white/70" /></button>
+          <button onClick={onOpenVision} title="Vision" className="p-2 rounded-full hover:bg-white/10 transition"><Eye className="text-white/70" /></button>
+          <button onClick={onOpenTerminal} title="Terminal" className="p-2 rounded-full hover:bg-white/10 transition"><Terminal className="text-white/70" /></button>
+          <button onClick={onOpenFiles} title="Files" className="p-2 rounded-full hover:bg-white/10 transition"><Folder className="text-white/70" /></button>
+          <button onClick={onRefresh} title="Refresh" className="p-2 rounded-full hover:bg-white/10 transition"><RefreshCw className="text-white/70" /></button>
         </div>
         
-        <PanelHost />
+        {panel === "vision" && (
+          <VisionPanel
+            onClose={()=>setPanel(null)}
+            onSpeak={speak}
+            thoughtsPush={thoughtsPush}
+          />
+        )}
+        {panel === "terminal" && (
+          <TerminalPanel
+            onClose={()=>setPanel(null)}
+            onOpenVision={()=>setPanel("vision")}
+            onOpenFiles={()=>setPanel("files")}
+          />
+        )}
+        {panel === "files" && <FilesPanel onClose={()=>setPanel(null)} />}
       </div>
     </div>
   );

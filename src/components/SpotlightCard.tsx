@@ -1,7 +1,7 @@
 import React from 'react';
 import { SettingsPanel } from './panels/SettingsPanel';
-import { TerminalPanel } from './panels/TerminalPanel';
-import { FilesPanel } from './panels/FilesPanel';
+import TerminalPanel from './panels/TerminalPanel'; // Changed to default import
+import FilesPanel from './panels/FilesPanel';     // Changed to default import
 import { uiBus } from '../runtime/uiBus';
 export default function SpotlightCard(){
   const [mode,setMode] = React.useState(uiBus.get());
