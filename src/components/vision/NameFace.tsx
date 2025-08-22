@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import type { Face } from '../../vision/types';
-import { upsert } from '../../vision/face/db';
+import { setFaceName } from '../../vision/face/db';
 
 export default function NameFace({
   candidate, onDone
-}: { candidate: Face | null; onDone: ()=>void }) {
+}: { candidate: Face & { trackId?: string } | null; onDone: ()=>void }) {
   const [name, setName] = useState('');
   if (!candidate) return null;
   return (
@@ -16,8 +16,8 @@ export default function NameFace({
         value={name}
         onChange={e=>setName(e.target.value)}
         onKeyDown={e=>{
-          if (e.key==='Enter' && name.trim() && candidate.descriptor) {
-            upsert(name.trim(), candidate.descriptor);
+          if (e.key==='Enter' && name.trim() && candidate.trackId) {
+            setFaceName(candidate.trackId, name.trim());
             setName(''); onDone();
           }
         }}

@@ -1,4 +1,6 @@
 import * as mobilenet from '@tensorflow-models/mobilenet';
+import type { SceneSense } from '../types';
+
 let net: mobilenet.MobileNet | null = null;
 
 export async function ensureSceneNet() {
@@ -7,9 +9,8 @@ export async function ensureSceneNet() {
   return net;
 }
 
-export async function classifyScene(video: HTMLVideoElement) {
-  const m = await ensureSceneNet();
-  const preds = await m.classify(video as any, 1);
+export async function detectScene(video: HTMLVideoElement, model: mobilenet.MobileNet): Promise<SceneSense | null> {
+  const preds = await model.classify(video as any, 1);
   if (!preds || !preds[0]) return null;
   return { label: preds[0].className, prob: preds[0].probability };
 }

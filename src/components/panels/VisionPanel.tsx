@@ -1,28 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { speak } from "../../runtime/voice";
-import { VisionEngine, Det } from '../../vision/engine';
+import { VisionEngine, Det, Detection } from '../../vision/engine';
 import Overlay from '../vision/Overlay';
+import { getFaceName, setFaceName, type TrackId } from "../../vision/face/db";
 
-type TrackId = string;
-const faceNameMap = new Map<TrackId, string>();
-
-function AskForName({ onSubmit }: { onSubmit: (name: string) => void }) {
-  const [v, setV] = React.useState("");
-  React.useEffect(() => {
+function AskForName({ onSubmit }:{ onSubmit:(name:string)=>void }){
+  const [v,setV] = React.useState("");
+  React.useEffect(()=>{
     speak("I don't recognize you yet. What should I call you?");
-  }, []);
+  },[]);
   return (
     <div className="mt-4 flex items-center gap-3">
       <input
         autoFocus
         value={v}
-        onChange={e => setV(e.target.value)}
-        onKeyDown={e => { if (e.key === "Enter" && v.trim()) onSubmit(v.trim()); }}
+        onChange={e=>setV(e.target.value)}
+        onKeyDown={e=>{ if(e.key==="Enter" && v.trim()) onSubmit(v.trim());}}
         placeholder="What should I call you?"
         className="flex-1 rounded-2xl px-4 py-3 text-slate-200 bg-slate-950/60 ring-1 ring-white/10 focus:outline-none"
       />
       <button
-        onClick={() => v.trim() && onSubmit(v.trim())}
+        onClick={()=> v.trim() && onSubmit(v.trim())}
         className="rounded-2xl px-4 py-3 bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white font-semibold shadow-lg shadow-violet-500/20">
         ➤
       </button>
@@ -43,7 +41,7 @@ export default function VisionPanel() {
     let mounted = true;
 
     async function onUnknownFace(trackId: TrackId) {
-      if (faceNameMap.has(trackId) || needNameFor === trackId) return;
+      if (getFaceName(trackId) || needNameFor === trackId) return;
       setNeedNameFor(trackId);
     }
 
@@ -58,14 +56,15 @@ export default function VisionPanel() {
         setDims({ w: v.videoWidth || 640, h: v.videoHeight || 480 });
 
         await engineRef.current.init();
-        engineRef.current.start(v, (detections) => {
+        engineRef.current.start(v, (detections: Detection[]) => {
           if (!mounted || isPaused) return;
-          const labeledDets = detections.map((d, i) => {
-            const trackId = d.trackId ?? `${i}`;
-            if (d.label === 'face' && !faceNameMap.has(trackId)) {
+          const labeledDets: Det[] = detections.map((d, i) => {
+            const trackId = (d as any).trackId ?? `${i}`;
+            if (d.label === 'face' && !getFaceName(trackId)) {
               onUnknownFace(trackId);
             }
-            return { ...d, label: faceNameMap.get(trackId) ?? d.label };
+            const [x, y, w, h] = d.box;
+            return { x, y, w, h, label: getFaceName(trackId) ?? d.label, score: d.score, trackId };
           });
           setDets(labeledDets);
         });
@@ -87,7 +86,7 @@ export default function VisionPanel() {
   }, [isPaused]);
 
   function enrollName(name: string) {
-    if (needNameFor) faceNameMap.set(needNameFor, name);
+    if (needNameFor) setFaceName(needNameFor, name);
     setNeedNameFor(undefined);
   }
 

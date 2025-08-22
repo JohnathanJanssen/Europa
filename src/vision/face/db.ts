@@ -1,32 +1,26 @@
-const KEY = 'jupiter_face_db_v1';
-export type Person = { name:string; vecs:number[][]; lastSeen:number; seen:number };
+/** Lightweight, persistent face-name store (per browser). */
+export type TrackId = string;
 
-function load(): Record<string, Person> {
-  try { return JSON.parse(localStorage.getItem(KEY) || '{}') } catch { return {}; }
-}
-function save(db: Record<string, Person>) { try { localStorage.setItem(KEY, JSON.stringify(db)); } catch {} }
+const KEY = "europa.faceDb.v1";
+type Store = Record<TrackId, string>;
 
-export function allPeople() { return load(); }
-export function forgetAll() { save({}); }
-export function upsert(name:string, vec:number[]) {
-  const db = load();
-  const p = db[name] || { name, vecs:[], lastSeen:0, seen:0 };
-  p.vecs.push(vec); while (p.vecs.length > 20) p.vecs.shift(); // cap
-  p.lastSeen = Date.now(); p.seen += 1;
-  db[name] = p; save(db);
+function read(): Store {
+  try { return JSON.parse(typeof localStorage !== "undefined" ? (localStorage.getItem(KEY) || "{}") : "{}"); }
+  catch { return {}; }
 }
-export function match(vec:number[], threshold=0.55): { name:string; distance:number } | null {
-  const db = load();
-  let best: { name:string; distance:number } | null = null;
-  function dist(a:number[], b:number[]) {
-    let s=0; for (let i=0;i<a.length;i++) { const d=a[i]-b[i]; s += d*d; } return Math.sqrt(s);
-  }
-  for (const name of Object.keys(db)) {
-    const p = db[name];
-    for (const v of p.vecs) {
-      const d = dist(vec, v);
-      if (!best || d < best.distance) best = { name, distance:d };
-    }
-  }
-  return (best && best.distance <= threshold) ? best : null;
+function write(s: Store) {
+  try { if (typeof localStorage !== "undefined") localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
 }
+
+let cache: Store = read();
+
+export function getFaceName(id: TrackId){ return cache[id]; }
+export function setFaceName(id: TrackId, name: string){ cache[id] = name; write(cache); }
+export function clearFaces(){ cache = {}; write(cache); }
+
+/** Map-like facade for legacy imports expecting `faceDb`. */
+export const faceDb = {
+  get: (id: TrackId) => getFaceName(id),
+  set: (id: TrackId, name: string) => setFaceName(id, name),
+  has: (id: TrackId) => !!getFaceName(id),
+};

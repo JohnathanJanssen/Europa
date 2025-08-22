@@ -3,7 +3,7 @@ import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import * as posedetection from '@tensorflow-models/pose-detection';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as faceapi from '@vladmandic/face-api';
-import { FaceDB } from './face/db';
+import { faceDb } from './face/db';
 import { speak } from '../runtime/voice';
 import { think } from './thoughts/bus';
 import { scanCenterText } from './skills/ocr';
@@ -11,16 +11,15 @@ import { detectMotion } from './skills/motion';
 import { detectNovelty } from './skills/novelty';
 import { detectQR } from './skills/qr';
 import { detectScene } from './skills/scene';
-import { Face, Insight, OCRHit, Pose, QRHit, SceneSense } from './types';
+import { Face, Insight, OCRHit, Pose, QRHit, SceneSense, Det } from './types';
 
-// Re-export Det from types.ts to ensure consistency
 export type { Det } from './types';
 
 export type Detection = {
   box: [number, number, number, number]; // [x, y, width, height]
   label: string;
   score: number;
-  trackId?: string; // Added trackId here
+  trackId?: string;
 };
 
 export class VisionEngine {
@@ -28,7 +27,6 @@ export class VisionEngine {
   private cocoSsdModel: cocoSsd.ObjectDetection | null = null;
   private poseDetector: posedetection.PoseDetector | null = null;
   private mobilenetModel: mobilenet.MobileNet | null = null;
-  private faceDb: FaceDB | null = null;
   private isRunning: boolean = false;
   private lastDetectionTime: number = 0;
   private frameCount: number = 0;
@@ -38,7 +36,7 @@ export class VisionEngine {
   }
 
   async init() {
-    if (this.cocoSsdModel && this.poseDetector && this.mobilenetModel && this.faceDb) {
+    if (this.cocoSsdModel && this.poseDetector && this.mobilenetModel) {
       return; // Already initialized
     }
 
@@ -61,7 +59,6 @@ export class VisionEngine {
     await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
     await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
     await faceapi.nets.faceExpressionNet.loadFromUri('/models');
-    this.faceDb = new FaceDB();
     think("FaceAPI loaded.");
 
     think("Vision models ready.");
@@ -79,7 +76,7 @@ export class VisionEngine {
   }
 
   private async detectFrame(onDetections: (detections: Detection[]) => void) {
-    if (!this.isRunning || !this.video || !this.cocoSsdModel || !this.poseDetector || !this.mobilenetModel || !this.faceDb) {
+    if (!this.isRunning || !this.video || !this.cocoSsdModel || !this.poseDetector || !this.mobilenetModel) {
       return;
     }
 
@@ -96,7 +93,7 @@ export class VisionEngine {
         box: [d.bbox[0], d.bbox[1], d.bbox[2], d.bbox[3]],
         label: d.class,
         score: d.score,
-        trackId: d.trackId // Assuming coco-ssd provides trackId
+        // trackId does not exist on DetectedObject, it will be added in the panel
       });
     });
 
@@ -119,25 +116,12 @@ export class VisionEngine {
       .withFaceExpressions()
       .withFaceDescriptors();
 
-    const faces: Face[] = [];
     for (const fd of faceDetections) {
-      const bestMatch = this.faceDb.findBestMatch(fd.descriptor);
-      const face: Face = {
-        x: fd.detection.box.x,
-        y: fd.detection.box.y,
-        w: fd.detection.box.width,
-        h: fd.detection.box.height,
-        name: bestMatch.label,
-        distance: bestMatch.distance,
-        descriptor: Array.from(fd.descriptor),
-        isNew: bestMatch.label === 'unknown' && bestMatch.distance > 0.6 // Heuristic for new unknown face
-      };
-      faces.push(face);
       detections.push({
-        box: [face.x, face.y, face.w, face.h],
-        label: face.name || 'face',
+        box: [fd.detection.box.x, fd.detection.box.y, fd.detection.box.width, fd.detection.box.height],
+        label: 'face',
         score: fd.detection.score,
-        trackId: fd.detection.trackId // Assuming face-api provides trackId
+        // trackId does not exist on FaceDetection, it will be added in the panel
       });
     }
 
@@ -165,13 +149,24 @@ export class VisionEngine {
       insights.push(motionInsight);
     }
 
+    // Convert Detection[] to Det[] for detectNovelty
+    const detObjects: Det[] = detections.map(d => ({
+      x: d.box[0],
+      y: d.box[1],
+      w: d.box[2],
+      h: d.box[3],
+      label: d.label,
+      score: d.score,
+      trackId: d.trackId
+    }));
+
     // Novelty Detection
-    const noveltyInsight = detectNovelty(detections, this.frameCount);
+    const noveltyInsight = detectNovelty(detObjects, this.frameCount);
     if (noveltyInsight) {
       insights.push(noveltyInsight);
     }
 
-    onDetections(detections); // Pass all detections to the callback
+    onDetections(detections);
 
     requestAnimationFrame(() => this.detectFrame(onDetections));
   }
