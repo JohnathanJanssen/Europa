@@ -1,14 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import "../styles/shell.css";
 
+/**
+ * Loads LiveCamera only if it exists (no hard import),
+ * otherwise falls back to a simple getUserMedia camera.
+ */
 type AnyComp = React.ComponentType<any> | null;
 
-export default function VisionPanel({ className, onClose }: { className?: string; onClose?: () => void; }) {
+export default function VisionPanel() {
   const [Comp, setComp] = useState<AnyComp>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // Try to find your real LiveCamera component (safe if missing).
       const candidates = import.meta.glob("/src/components/vision/LiveCamera.tsx");
       const load = candidates["/src/components/vision/LiveCamera.tsx"];
       if (load) {
@@ -16,7 +21,9 @@ export default function VisionPanel({ className, onClose }: { className?: string
           const mod: any = await load();
           if (!cancelled) setComp(() => (mod?.default ?? null));
           return;
-        } catch {}
+        } catch {
+          // fall through to fallback
+        }
       }
       if (!cancelled) setComp(() => FallbackCamera);
     })();
@@ -25,7 +32,7 @@ export default function VisionPanel({ className, onClose }: { className?: string
 
   const Body = Comp ?? Placeholder;
   return (
-    <div className={className} style={{ height: "100%", display: "grid" }}>
+    <div className="jupiter-panel" style={{ height: "100%", display: "grid" }}>
       <Body />
     </div>
   );
@@ -50,7 +57,9 @@ function FallbackCamera() {
           videoRef.current.srcObject = stream;
           await videoRef.current.play();
         }
-      } catch {}
+      } catch {
+        // ignore; camera blocked or unavailable
+      }
     })();
     return () => {
       mounted = false;
