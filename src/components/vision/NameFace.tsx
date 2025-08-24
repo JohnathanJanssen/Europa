@@ -1,19 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import type { Face } from '../../vision/types';
 import { setFaceName } from '../../vision/face/db';
-import { speakNow } from '@/runtime/voice';
 
 export default function NameFace({
   candidate, onDone
 }: { candidate: Face & { trackId?: string } | null; onDone: ()=>void }) {
   const [name, setName] = useState('');
-
-  useEffect(() => {
-    if (candidate) {
-      speakNow("I don’t recognize you yet. What should I call you?");
-    }
-  }, [candidate]);
-
   if (!candidate) return null;
   return (
     <div className="absolute top-2 right-2 bg-black/60 backdrop-blur rounded-lg p-2 text-xs flex items-center gap-2 z-10">
