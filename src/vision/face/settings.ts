@@ -1,2 +1,2 @@
-import { clearFaces } from './db';
-export function forgetFaces() { clearFaces(); }
+import { forgetAll } from './db';
+export function forgetFaces() { forgetAll(); }

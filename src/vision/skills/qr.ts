@@ -1,7 +1,5 @@
 import jsQR from 'jsqr';
-import type { QRHit } from '../types';
-
-export function detectQR(video: HTMLVideoElement): QRHit | null {
+export function scanQR(video: HTMLVideoElement) {
   const w = video.videoWidth || 640, h = video.videoHeight || 480;
   if (!w || !h) return null;
   const cvs = document.createElement('canvas'); cvs.width=w; cvs.height=h;

@@ -1,7 +1,5 @@
-import type { Insight } from '../types';
-
 /** Frame differencing heatmap at low-res; returns zones and a 2D grid of intensities 0..1 */
-class Motion {
+export class Motion {
   private prev?: ImageData;
   private cw=96; private ch=54; // ~16:9
   analyze(video: HTMLVideoElement) {
@@ -33,13 +31,4 @@ class Motion {
       }
     };
   }
-}
-
-const motion = new Motion();
-export function detectMotion(video: HTMLVideoElement): Insight | null {
-    const m = motion.analyze(video);
-    const intensity = (m.zones.left + m.zones.center + m.zones.right) / 3;
-    if (intensity < 0.01) return null;
-    const maxZone = Object.entries(m.zones).reduce((a, b) => a[1] > b[1] ? a : b)[0] as 'left'|'center'|'right';
-    return { kind: 'motion', at: Date.now(), zone: maxZone, intensity };
 }

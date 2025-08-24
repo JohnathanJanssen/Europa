@@ -8,6 +8,9 @@ export type Insight =
 export type Face = {
   x:number; y:number; w:number; h:number;
   name?: string;             // assigned if known
+  distance?: number;         // match score (lower better)
+  descriptor?: number[];     // 128D embedding when unknown (for naming)
+  isNew?: boolean;           // true if we’ve never seen this identity
 };
 
 export type PoseKeypoint = { x:number; y:number; score:number };

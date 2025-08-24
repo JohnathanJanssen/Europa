@@ -11,7 +11,7 @@ export default function Overlay({ dets, width, height }: Props) {
   return (
     <div className="absolute inset-0 pointer-events-none">
       {dets.map((d, i) => {
-        const { x, y, w, h } = d;
+        const [x, y, w, h] = d.bbox;
         const left = (x / width) * 100;
         const top  = (y / height) * 100;
         const boxW = (w / width) * 100;
