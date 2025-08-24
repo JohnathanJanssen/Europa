@@ -1,4 +1,5 @@
 import React from 'react';
+import LiveCamera from './vision/LiveCamera';
 import { SettingsPanel } from './panels/SettingsPanel';
 import { TerminalPanel } from './panels/TerminalPanel';
 import { FilesPanel } from './panels/FilesPanel';
@@ -8,6 +9,7 @@ export default function SpotlightCard(){
   React.useEffect(()=>uiBus.on(setMode),[]);
   return (
     <div className="rounded-2xl bg-zinc-950/80 border border-zinc-800 p-3">
+      {mode==='vision'   && <LiveCamera/>}
       {mode==='settings' && <SettingsPanel/>}
       {mode==='terminal' && <TerminalPanel/>}
       {mode==='files'    && <FilesPanel/>}

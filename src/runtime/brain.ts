@@ -1,5 +1,3 @@
-import { useState, useCallback } from 'react';
-
 export type Msg = { role:'system'|'user'|'assistant', content:string };
 
 const SYSTEM_BRIEF = [
@@ -45,31 +43,4 @@ export async function chat(messages: Msg[]): Promise<string> {
   if (HF_TOKEN){ try { return await chatHF(fullMessages); } catch {} }
   const last = [...messages].reverse().find(m=>m.role==='user')?.content || '';
   return `…${last}`;
-}
-
-export function useBrain() {
-  const [messages, setMessages] = useState<Msg[]>([{ role: 'assistant', content: 'Hi! How can I help?' }]);
-  const [isThinking, setIsThinking] = useState(false);
-
-  const ask = useCallback(async (text: string) => {
-    setIsThinking(true);
-    const userMessage: Msg = { role: 'user', content: text };
-    setMessages(prev => [...prev, userMessage]);
-
-    try {
-      const replyContent = await chat([...messages, userMessage]);
-      const assistantMessage: Msg = { role: 'assistant', content: replyContent };
-      setMessages(prev => [...prev, assistantMessage]);
-      return { text: replyContent, speech: true }; // Assuming speech is desired by default
-    } catch (error) {
-      console.error("Brain error:", error);
-      const errorMessage: Msg = { role: 'assistant', content: 'Sorry, I encountered an error.' };
-      setMessages(prev => [...prev, errorMessage]);
-      return { text: 'Sorry, I encountered an error.', speech: true };
-    } finally {
-      setIsThinking(false);
-    }
-  }, [messages]);
-
-  return { messages, isThinking, ask };
 }
