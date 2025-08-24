@@ -1,8 +1,8 @@
 import React from "react";
+import { usePanel, setPanel } from "../runtime/panel";
 import VisionPanel from "./panels/VisionPanel";
-import TerminalPanel from "./panels/TerminalPanel";
-import FilesPanel from "./panels/FilesPanel";
-import { usePanel, setPanel } from "../runtime/panel"; // Added import for usePanel and setPanel
+import { TerminalPanel } from "./panels/TerminalPanel";
+import { FilesPanel } from "./panels/FilesPanel";
 
 export default function PanelHost(){
   const p = usePanel();

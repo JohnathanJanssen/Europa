@@ -1,79 +1,49 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 
-type Entry = { type: "in" | "out"; text: string };
+type Line = { in?: string; out?: string };
 
-export default function TerminalPanel({
-  onClose,
-  onOpenVision,
-  onOpenFiles,
-}: {
-  onClose?: () => void;
-  onOpenVision?: () => void;
-  onOpenFiles?: () => void;
-}) {
-  const [hist, setHist] = useState<Entry[]>([{ type:"out", text:"Jupiter terminal. Type `help`." }]);
-  const [cmd, setCmd] = useState("");
-  const ref = useRef<HTMLInputElement>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+export function TerminalPanel(){
+  const [buf,setBuf] = React.useState<Line[]>([{ out: "Jupiter sandbox terminal. Type 'help'." }]);
+  const [line,setLine] = React.useState("");
+  const scrollRef = React.useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (bodyRef.current) {
-      bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [hist]);
+  }, [buf]);
 
-  function println(text: string){ setHist(h => [...h, { type:"out", text }]); }
-  function run(line: string){
-    setHist(h => [...h, { type:"in", text: line }]);
-    const t = line.trim().toLowerCase();
-
-    if (t === "help") {
-      println("Commands: help, clear, vision, files, echo <text>, whoami");
-    } else if (t === "clear") {
-      setHist([]);
-    } else if (t === "vision") {
-      println("Opening Vision…"); onOpenVision?.();
-    } else if (t === "files") {
-      println("Opening Files…"); onOpenFiles?.();
-    } else if (t.startsWith("echo ")) {
-      println(line.trim().slice(5));
-    } else if (t === "whoami") {
-      println("Jupiter");
-    } else if (t) {
-      println(`Unknown: ${t}`);
+  function run(cmd: string){
+    const [head,...rest] = cmd.trim().split(/\s+/);
+    const arg = rest.join(" ");
+    let out = "";
+    switch((head||"").toLowerCase()){
+      case "help": out = "Commands: help, echo <text>, time, clear"; break;
+      case "echo": out = arg; break;
+      case "time": out = new Date().toLocaleString(); break;
+      case "clear": setBuf([]); return;
+      default: out = head ? `Unknown command: ${head}` : ""; break;
     }
-  }
-  function submit(){
-    if (!cmd.trim()) return;
-    run(cmd);
-    setCmd("");
-    ref.current?.focus();
+    setBuf(b=>[...b, { in: cmd }, { out }]);
   }
 
   return (
-    <div className="panel-card">
-      <div className="panel-head">
-        <div className="title">Terminal</div>
-        <button className="close" onClick={onClose}>Close</button>
-      </div>
-
-      <div ref={bodyRef} className="term-body">
-        {hist.map((e,i)=>(
-          <div key={i} className={e.type==="in"?"line in":"line"}>
-            {e.type==="in" && <span className="mr-2">$</span>}
-            {e.text}
+    <div className="h-full flex flex-col">
+      <div ref={scrollRef} className="flex-1 rounded-xl bg-black/50 ring-1 ring-white/10 p-3 h-56 overflow-auto font-mono text-sm text-slate-200">
+        {buf.map((l,i)=>(
+          <div key={i} className="whitespace-pre-wrap">
+            {l.in  && <div className="text-sky-300"><span>➜ </span><span>{l.in}</span></div>}
+            {l.out && <span className="block text-slate-200/90">{l.out}</span>}
           </div>
         ))}
       </div>
-      <div className="enroll-row">
-        <input
-          ref={ref}
-          value={cmd}
-          onChange={e=>setCmd(e.target.value)}
-          onKeyDown={e=>{ if(e.key==="Enter") submit(); }}
-          placeholder="Type a command…"
-        />
-        <button className="send" onClick={submit}>➤</button>
+      <div className="mt-3 flex items-center gap-2">
+        <input value={line} onChange={e=>setLine(e.target.value)}
+          onKeyDown={e=>{ if(e.key==="Enter"){ run(line); setLine(""); }}}
+          placeholder="Type a command..."
+          className="flex-1 rounded-xl px-4 py-2 text-slate-200 bg-slate-950/60 ring-1 ring-white/10 focus:outline-none"/>
+        <button onClick={()=>{ run(line); setLine(""); }}
+          className="rounded-xl px-4 py-2 bg-slate-800/70 text-white ring-1 ring-white/10">Run</button>
       </div>
     </div>
   );
